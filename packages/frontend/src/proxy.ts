@@ -10,7 +10,7 @@ type UserRole = "PRACTICANT" | "ADMIN";
  * Пока что пропускаем все запросы. Серверная проверка авторизации
  * реализуется через API-клиент на клиенте.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Публичные пути — пропускаем всегда
