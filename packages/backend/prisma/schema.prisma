@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String            @id @default(cuid())
+  email             String            @unique
+  passwordHash      String
+  role              String            @default("PRACTICANT")
+  isEmailVerified   Boolean           @default(false)
+  verificationToken String?
+  tokenExpiresAt    DateTime?
+  verifiedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  applications      Application[]
+  studentDocuments  StudentDocumentData[]
+  taskCards         TaskCard[]
+
+  passwordResetToken     String?   @unique
+  passwordResetExpiresAt DateTime?
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+model Cohort {
+  id                String            @id @default(cuid())
+  name              String            
+  applicationStart  DateTime
+  applicationEnd    DateTime
+  practiceStart     DateTime
+  practiceEnd       DateTime
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  surveyFields      SurveyField[]
+  applications      Application[]
+  roles             CohortRole[]
+  testTask          TestTask?
+  studentDocuments  StudentDocumentData[]
+  taskCards         TaskCard[]
+
+  @@index([name])
+  @@map("cohorts")
+}
+
+model SurveyField {
+  id                String            @id @default(cuid())
+  cohortId          String
+  label             String            
+  type              String            
+  options           String?           
+  order             Int               
+  isRequired        Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  cohort            Cohort            @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  fieldValues       SurveyFieldValue[]
+
+  @@index([cohortId])
+  @@index([cohortId, order])
+  @@map("survey_fields")
+}
+
+model SurveyFieldValue {
+  id                String            @id @default(cuid())
+  applicationId     String
+  fieldId           String
+  value             String            
+  
+  application       Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  field             SurveyField       @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  
+  @@index([applicationId])
+  @@index([fieldId])
+  @@unique([applicationId, fieldId])
+  @@map("survey_field_values")
+}
+
+model Application {
+  id                String            @id @default(cuid())
+  userId            String
+  cohortId          String
+  roleId            String?
+  status            String            @default("pending")
+  reviewComment     String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cohort            Cohort            @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  role              CohortRole?       @relation(fields: [roleId], references: [id])
+  fieldValues       SurveyFieldValue[]
+  studentDocument   StudentDocumentData?
+
+  @@index([cohortId]) 
+  @@index([status])
+  @@index([cohortId, status])
+  @@index([userId])
+  @@map("applications")
+}
+
+model CohortRole {
+  id                String            @id @default(cuid())
+  cohortId          String
+  name              String            
+  createdAt         DateTime          @default(now())
+  
+  cohort            Cohort            @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  applications      Application[]
+  
+  @@map("cohort_roles")
+}
+
+model TestTask {
+  id                String            @id @default(cuid())
+  cohortId          String            @unique
+  content           String            
+  publishedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  cohort            Cohort            @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  
+  @@index([publishedAt])
+  @@map("test_tasks")
+}
+
+model StudentDocumentData {
+  id                String            @id @default(cuid())
+  userId            String
+  cohortId          String
+  applicationId     String            @unique
+  
+  studentFio        String?
+  group             String?
+  directionCode     String?           
+  directionName     String?           
+  programName       String?           
+  specialty         String?           
+  practiceTopic     String?
+  mainStageTasks    String?           
+  
+  // Отзыв (заполняется админом)
+  reviewActivities          String?
+  reviewCharacteristic      String?
+  reviewEmployed            String?   
+  reviewNextPractice        String?   
+  reviewEmploymentOffer     String?   
+  reviewSuggestions         String?
+  reviewGrade               String?
+  
+  // Отчёт
+  reportFileUrl       String?         
+  
+  // === Индивидуальное задание ===
+  individualTaskFileUrl       String?   // URL сгенерированного файла
+  individualTaskStatus        String?   // draft, pending, approved, rejected, revised
+  individualTaskComment       String?   // Комментарий админа при отклонении
+  individualTaskAdminFileUrl  String?   // URL подписанного файла от админа
+  
+  // === Отчёт ===
+  reportStatus            String?       // draft, pending, approved, rejected, revised
+  reportComment           String?       // Комментарий админа
+  reportAdminFileUrl      String?       // URL файла с подписью/отметкой админа
+  
+  // === Титульный лист ===
+  titlePageFileUrl        String?       // URL сгенерированного титульного листа
+  titlePageStatus         String?       // draft, pending, approved, rejected, revised
+  titlePageComment        String?       // Комментарий админа
+  titlePageAdminFileUrl   String?       // URL подписанного титульного листа
+  
+  // === Отзыв ===
+  reviewFileUrl           String?       // URL сгенерированного отзыва
+  reviewStatus            String?       // draft, pending, approved, rejected, revised
+  reviewComment           String?       // Комментарий админа
+  reviewAdminFileUrl      String?       // URL подписанного отзыва
+  
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cohort              Cohort          @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  application         Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, cohortId])
+  @@index([cohortId])
+  @@map("student_document_data")
+}
+
+model TaskCard {
+  id                String            @id @default(cuid())
+  userId            String
+  cohortId          String
+  date              DateTime          
+  title             String
+  description       String?
+  artifactLink      String?           
+  updatedAt         DateTime          @updatedAt
+  createdAt         DateTime          @default(now())
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cohort            Cohort            @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  
+  @@index([cohortId, date]) 
+  @@index([userId, cohortId])
+  @@index([date])
+  @@unique([userId, cohortId, date])
+  @@map("task_cards")
+}
+
+model SystemSettings {
+  id                String            @id @default(cuid())
+  key               String            @unique
+  value             String
+  description       String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  @@map("system_settings")
+}
