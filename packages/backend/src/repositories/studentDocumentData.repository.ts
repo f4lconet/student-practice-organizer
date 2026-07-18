@@ -28,9 +28,11 @@ export const studentDocumentDataRepository = {
   },
 
   async setReportFile(id: string, fileUrl: string): Promise<StudentDocumentData> {
+    const existing = await prisma.studentDocumentData.findUnique({ where: { id } });
+    const status = existing?.reportStatus === 'rejected' ? 'revised' : 'pending';
     return prisma.studentDocumentData.update({
       where: { id },
-      data: { reportFileUrl: fileUrl },
+      data: { reportFileUrl: fileUrl, reportStatus: status },
     });
   },
 
@@ -38,6 +40,7 @@ export const studentDocumentDataRepository = {
     reviewActivities?: string;
     reviewCharacteristic?: string;
     reviewEmployed?: string;
+    reviewEmployedPosition?: string;
     reviewNextPractice?: string;
     reviewEmploymentOffer?: string;
     reviewSuggestions?: string;

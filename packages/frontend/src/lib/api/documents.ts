@@ -15,11 +15,14 @@ export interface StudentDocumentData {
   reviewActivities: string | null;
   reviewCharacteristic: string | null;
   reviewEmployed: string | null;
+  reviewEmployedPosition: string | null;
   reviewNextPractice: string | null;
   reviewEmploymentOffer: string | null;
   reviewSuggestions: string | null;
   reviewGrade: string | null;
   reportFileUrl: string | null;
+  reportStatus: string;
+  reportComment: string | null;
   reportAdminApproved: boolean;
 }
 
@@ -59,6 +62,8 @@ export interface AdminStudentDocumentInfo {
   roleId: string;
   /** URL файла отчёта (если есть) */
   reportFileUrl: string | null;
+  /** Комментарий к отчёту от админа */
+  reportComment: string | null;
   /** Одобрен ли отчёт администратором */
   reportAdminApproved: boolean;
 }
@@ -112,6 +117,7 @@ export function uploadReport(cohortId: string, file: File) {
 export function generateDocument(type: "individual-task" | "title-page" | "review", cohortId: string) {
   return apiClient.get<Blob>(`/documents/my/${type}/generate?cohortId=${cohortId}`, {
     skipAuth: false,
+    responseType: "blob",
   });
 }
 
@@ -144,6 +150,7 @@ export function saveAdminReview(
     reviewActivities?: string;
     reviewCharacteristic?: string;
     reviewEmployed?: string;
+    reviewEmployedPosition?: string;
     reviewNextPractice?: string;
     reviewEmploymentOffer?: string;
     reviewSuggestions?: string;
@@ -157,27 +164,31 @@ export function saveAdminReview(
 }
 
 /**
- * Подтвердить отчёт (админ).
- * PATCH /api/admin/documents/:userId/:cohortId/approve-report
+ * Одобрить отчёт (админ).
+ * PATCH /api/admin/documents/:userId/:cohortId/report/approve
  */
 export function approveReport(
   userId: string,
   cohortId: string,
-  approved: boolean,
+  comment?: string,
 ): Promise<void> {
   return apiClient.patch<void>(
-    `/admin/documents/${userId}/${cohortId}/approve-report`,
-    { approved },
+    `/admin/documents/${userId}/${cohortId}/report/approve`,
+    { comment },
   );
 }
 
 /**
- * Скачать файл отчёта через API с авторизацией.
- * GET /api/documents/my/report/download
+ * Отклонить отчёт (админ) с комментарием.
+ * PATCH /api/admin/documents/:userId/:cohortId/report/reject
  */
-export function downloadReportFile(fileUrl: string): Promise<Blob> {
-  const url = fileUrl.startsWith("/") ? fileUrl : `/${fileUrl}`;
-  return apiClient.get<Blob>(url, {
-    responseType: "blob",
-  });
+export function rejectReport(
+  userId: string,
+  cohortId: string,
+  comment: string,
+): Promise<void> {
+  return apiClient.patch<void>(
+    `/admin/documents/${userId}/${cohortId}/report/reject`,
+    { comment },
+  );
 }

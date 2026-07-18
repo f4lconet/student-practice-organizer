@@ -30,6 +30,7 @@ import {
   Save,
   CheckCheck,
   XCircle,
+  MessageSquareWarning,
 } from "lucide-react";
 
 // =====================================================
@@ -48,7 +49,6 @@ const FORM_FIELDS: FormField[] = [
   { key: "directionCode", label: "Код направления", type: "text", placeholder: "09.03.04" },
   { key: "directionName", label: "Направление", type: "text", placeholder: "Программная инженерия" },
   { key: "programName", label: "Наименование программы", type: "text", placeholder: "Разработка и сопровождение ПО" },
-  { key: "specialty", label: "Специальность", type: "text", placeholder: "Программист" },
   { key: "practiceTopic", label: "Тема практики", type: "text", placeholder: "Тема практики" },
   { key: "mainStageTasks", label: "Основные этапы работ", type: "textarea", placeholder: "1. ...\n2. ...\n3. ..." },
 ];
@@ -60,17 +60,24 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 // =====================================================
 function ReportUploadSection({
   reportFileName,
+  reportStatus,
+  reportComment,
   isReportApproved,
   onUpload,
   isUploading,
 }: {
   reportFileName: string | null;
+  reportStatus: string;
+  reportComment: string | null;
   isReportApproved: boolean;
   onUpload: (file: File) => void;
   isUploading: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  const isRejected = reportStatus === "rejected";
+  const isPending = !isReportApproved && !isRejected && !!reportFileName;
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -108,7 +115,12 @@ function ReportUploadSection({
             {isReportApproved ? (
               <Badge variant="default" className="shrink-0">
                 <CheckCircle2 className="mr-1 h-3 w-3" />
-                Допущен
+                Принят
+              </Badge>
+            ) : isRejected ? (
+              <Badge variant="destructive" className="shrink-0">
+                <XCircle className="mr-1 h-3 w-3" />
+                Отклонён
               </Badge>
             ) : (
               <Badge variant="secondary" className="shrink-0">
@@ -116,43 +128,61 @@ function ReportUploadSection({
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
-            {isReportApproved
-              ? "Администратор одобрил отчёт. Титульный лист доступен для формирования."
-              : "Отчёт отправлен на проверку администратору."}
-          </p>
+
+          {/* Комментарий при отклонении */}
+          {isRejected && reportComment && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm">
+              <MessageSquareWarning className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
+              <div>
+                <p className="font-medium text-destructive">Отчёт отклонён</p>
+                <p className="text-muted-foreground mt-1">{reportComment}</p>
+              </div>
+            </div>
+          )}
+
+          {isPending && (
+            <p className="text-xs text-muted-foreground">
+              Отчёт отправлен на проверку администратору.
+            </p>
+          )}
         </div>
       ) : null}
 
-      {/* Drag&drop зона */}
-      <div
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
-          isDragOver
-            ? "border-primary bg-primary/5"
-            : "border-muted-foreground/25 hover:border-muted-foreground/50"
-        }`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsDragOver(true);
-        }}
-        onDragLeave={() => setIsDragOver(false)}
-        onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
-      >
-        <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
-        <p className="text-sm font-medium">
-          {isUploading ? "Загрузка..." : "Перетащите файл сюда или нажмите для выбора"}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">.docx или .pdf</p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".docx,.pdf"
-          className="hidden"
-          onChange={handleFileSelect}
-          disabled={isUploading}
-        />
-      </div>
+      {/* Зона загрузки — показываем если нет файла, или если его отклонили */}
+      {(!reportFileName || isRejected) && (
+        <div
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
+            isDragOver
+              ? "border-primary bg-primary/5"
+              : "border-muted-foreground/25 hover:border-muted-foreground/50"
+          } ${isRejected ? "border-destructive/30 hover:border-destructive/50" : ""}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragOver(true);
+          }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
+          <p className="text-sm font-medium">
+            {isUploading
+              ? "Загрузка..."
+              : isRejected
+                ? "Нажмите, чтобы загрузить исправленный файл"
+                : "Перетащите файл сюда или нажмите для выбора"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">.docx или .pdf</p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".docx,.pdf"
+            className="hidden"
+            onChange={handleFileSelect}
+            disabled={isUploading}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -195,7 +225,7 @@ export default function CabinetDocumentsPage() {
       initializedRef.current = true;
       const initial: Record<string, string> = {};
       for (const field of FORM_FIELDS) {
-        initial[field.key] = (docData[field.key] as string) ?? "";
+        initial[field.key] = (docData as unknown as Record<string, string | null>)[field.key] ?? "";
       }
       setFormValues(initial);
     }
@@ -229,18 +259,24 @@ export default function CabinetDocumentsPage() {
     },
   });
 
+  const FILENAME_MAP: Record<string, string> = {
+    "individual-task": "Индивидуальное задание.docx",
+    "title-page": "Титульный лист.docx",
+    review: "Отзыв.docx",
+  };
+
   // 4. Мутация формирования документа
   const generateMutation = useMutation({
     mutationFn: (type: string) =>
       generateDocument(type as "individual-task" | "review" | "title-page", cohortId),
-    onSuccess: (data) => {
+    onSuccess: (data, type) => {
       toast.success("Документ сформирован!");
       // Скачиваем файл — ответ это Blob
       if (data instanceof Blob) {
         const url = URL.createObjectURL(data);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "document.docx";
+        a.download = FILENAME_MAP[type] || "document.docx";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -351,7 +387,9 @@ export default function CabinetDocumentsPage() {
 
   const applicationApproved = application?.status === "approved";
   const reportFileName = docData?.reportFileUrl ?? null;
-  const isReportApproved = docData?.reportAdminApproved ?? false;
+  const reportStatus = docData?.reportStatus ?? "";
+  const reportComment = docData?.reportComment ?? null;
+  const isReportApproved = reportStatus === "approved";
 
   return (
     <div className="space-y-8">
@@ -448,6 +486,8 @@ export default function CabinetDocumentsPage() {
         <CardContent>
           <ReportUploadSection
             reportFileName={reportFileName}
+            reportStatus={reportStatus}
+            reportComment={reportComment}
             isReportApproved={isReportApproved}
             onUpload={handleUploadReport}
             isUploading={isUploading}
@@ -493,9 +533,11 @@ export default function CabinetDocumentsPage() {
           isReady={isReportApproved}
           readyLabel="Можно сформировать"
           notReadyLabel={
-            reportFileName
-              ? "Ожидает одобрения администратором"
-              : "Сначала загрузите отчёт"
+            reportFileName && reportStatus === "rejected"
+              ? "Отчёт отклонён. Исправьте и загрузите снова."
+              : reportFileName
+                ? "Ожидает одобрения администратором"
+                : "Сначала загрузите отчёт"
           }
           isGenerating={generatingType === "title-page"}
           onGenerate={() => handleGenerate("title-page")}

@@ -153,9 +153,10 @@ model StudentDocumentData {
   // Отзыв (заполняется админом)
   reviewActivities          String?
   reviewCharacteristic      String?
-  reviewEmployed            String?   
-  reviewNextPractice        String?   
-  reviewEmploymentOffer     String?   
+  reviewEmployed            String?
+  reviewEmployedPosition    String?
+  reviewNextPractice        String?
+  reviewEmploymentOffer     String?
   reviewSuggestions         String?
   reviewGrade               String?
   

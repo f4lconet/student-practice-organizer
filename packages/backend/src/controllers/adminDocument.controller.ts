@@ -65,4 +65,28 @@ export const adminDocumentController = {
       next(error);
     }
   },
+
+  async setReview(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+      const cohortId = Array.isArray(req.params.cohortId) ? req.params.cohortId[0] : req.params.cohortId;
+
+      const { reviewActivities, reviewCharacteristic, reviewEmployed, reviewEmployedPosition, reviewNextPractice, reviewEmploymentOffer, reviewSuggestions, reviewGrade } = req.body;
+
+      const doc = await documentService.setReview(userId, cohortId, {
+        reviewActivities,
+        reviewCharacteristic,
+        reviewEmployed,
+        reviewEmployedPosition,
+        reviewNextPractice,
+        reviewEmploymentOffer,
+        reviewSuggestions,
+        reviewGrade,
+      });
+
+      res.json(doc);
+    } catch (error) {
+      next(error);
+    }
+  },
 };

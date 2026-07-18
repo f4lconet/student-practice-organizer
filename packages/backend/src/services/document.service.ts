@@ -10,7 +10,7 @@ import { DocumentType, DocumentStatus } from '../types/document.types.js';
 const REQUIRED_FIELDS: Record<'individual' | 'review' | 'title', string[]> = {
   individual: ['studentFio', 'group', 'directionCode', 'directionName', 'programName', 'practiceTopic', 'mainStageTasks'],
   review: ['studentFio', 'group', 'reviewActivities', 'reviewCharacteristic', 'reviewEmployed', 'reviewNextPractice', 'reviewEmploymentOffer', 'reviewSuggestions', 'reviewGrade'],
-  title: ['studentFio', 'group', 'specialty', 'practiceTopic'],
+  title: ['studentFio', 'group', 'directionCode', 'directionName', 'practiceTopic'],
 };
 
 const TEMPLATE_MAP: Record<string, string> = {
@@ -31,8 +31,13 @@ function checkEligibility(doc: StudentDocumentData, type: 'individual' | 'review
   if (type === 'individual' && applicationStatus !== 'approved') {
     throw new ValidationError('Заявка ещё не одобрена');
   }
-  if (type === 'title' && !doc.reportFileUrl) {
-    throw new ValidationError('Отчёт не загружен');
+  if (type === 'title') {
+    if (!doc.reportFileUrl) {
+      throw new ValidationError('Отчёт не загружен');
+    }
+    if (doc.reportStatus !== 'approved') {
+      throw new ValidationError('Отчёт ещё не одобрен администратором');
+    }
   }
 
   const missing = REQUIRED_FIELDS[type].filter((key) => !(doc as any)[key]);
@@ -79,6 +84,20 @@ export const documentService = {
     const requiredKey = type === 'individual-task' ? 'individual' : type === 'title-page' ? 'title' : type;
     checkEligibility(doc, requiredKey as 'individual' | 'review' | 'title', application.status);
 
+    // Helper to format date as DD.MM.YYYY
+    const formatDate = (date: Date) => {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}.${month}.${year}`;
+    };
+
+    // Русские названия месяцев
+    const MONTHS_RU = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+    ];
+
     // Build data for template
     const templateData: Record<string, unknown> = {
       studentFio: doc.studentFio,
@@ -91,17 +110,28 @@ export const documentService = {
       mainStageTasks: doc.mainStageTasks,
       reviewActivities: doc.reviewActivities,
       reviewCharacteristic: doc.reviewCharacteristic,
-      reviewEmployed: doc.reviewEmployed,
+      reviewEmployed: doc.reviewEmployed === "Да"
+        ? `Да, ${doc.reviewEmployedPosition || ""}`
+        : doc.reviewEmployed === "Нет"
+          ? "Нет"
+          : doc.reviewEmployed,
       reviewNextPractice: doc.reviewNextPractice,
       reviewEmploymentOffer: doc.reviewEmploymentOffer,
       reviewSuggestions: doc.reviewSuggestions,
       reviewGrade: doc.reviewGrade,
-      practiceStart: cohort.practiceStart.toISOString().split('T')[0],
-      practiceEnd: cohort.practiceEnd.toISOString().split('T')[0],
+      practiceStart: formatDate(cohort.practiceStart),
+      practiceEnd: formatDate(cohort.practiceEnd),
       // Вычисляемые даты для шаблона
-      practiceStartPlus7: new Date(cohort.practiceStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      practiceStartPlus23: new Date(cohort.practiceStart.getTime() + 23 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      practiceEndMinus3: new Date(cohort.practiceEnd.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      practiceStartPlus7: formatDate(new Date(cohort.practiceStart.getTime() + 7 * 24 * 60 * 60 * 1000)),
+      practiceStartPlus23: formatDate(new Date(cohort.practiceStart.getTime() + 23 * 24 * 60 * 60 * 1000)),
+      practiceEndMinus3: formatDate(new Date(cohort.practiceEnd.getTime() - 3 * 24 * 60 * 60 * 1000)),
+      // Отдельные части дат для гибкого использования в шаблоне
+      practiceStartDay: String(cohort.practiceStart.getDate()).padStart(2, '0'),
+      practiceStartMonth: MONTHS_RU[cohort.practiceStart.getMonth()],
+      practiceStartYear: String(cohort.practiceStart.getFullYear()).slice(-2),
+      practiceEndDay: String(cohort.practiceEnd.getDate()).padStart(2, '0'),
+      practiceEndMonth: MONTHS_RU[cohort.practiceEnd.getMonth()],
+      practiceEndYear: String(cohort.practiceEnd.getFullYear()).slice(-2),
     };
 
     return docxService.generate(templateName, templateData);
@@ -111,6 +141,7 @@ export const documentService = {
     reviewActivities?: string;
     reviewCharacteristic?: string;
     reviewEmployed?: string;
+    reviewEmployedPosition?: string;
     reviewNextPractice?: string;
     reviewEmploymentOffer?: string;
     reviewSuggestions?: string;
@@ -198,9 +229,9 @@ export const documentService = {
     const fieldPrefix = TYPE_FIELD_PREFIX[type];
     const currentStatus = (doc as any)[`${fieldPrefix}Status`] as string | null;
 
-    // Can only approve documents that are pending or revised
-    if (currentStatus !== 'pending' && currentStatus !== 'revised') {
-      throw new ValidationError('Документ не находится на проверке');
+    // Can only approve documents that are not already approved/rejected (draft/pending/revised/null are ok)
+    if (currentStatus === 'approved' || currentStatus === 'rejected') {
+      throw new ValidationError('Документ уже обработан');
     }
 
     const updated = await studentDocumentDataRepository.approveDocument(doc.id, fieldPrefix, adminFileUrl, comment);
@@ -229,9 +260,9 @@ export const documentService = {
     const fieldPrefix = TYPE_FIELD_PREFIX[type];
     const currentStatus = (doc as any)[`${fieldPrefix}Status`] as string | null;
 
-    // Can only reject documents that are pending or revised
-    if (currentStatus !== 'pending' && currentStatus !== 'revised') {
-      throw new ValidationError('Документ не находится на проверке');
+    // Can only reject documents that are not already approved/rejected (draft/pending/revised/null are ok)
+    if (currentStatus === 'approved' || currentStatus === 'rejected') {
+      throw new ValidationError('Документ уже обработан');
     }
 
     const updated = await studentDocumentDataRepository.rejectDocument(doc.id, fieldPrefix, comment);

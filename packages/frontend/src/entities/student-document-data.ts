@@ -14,10 +14,15 @@ export interface StudentDocumentData {
   reviewActivities: string | null;
   reviewCharacteristic: string | null;
   reviewEmployed: string | null;
+  reviewEmployedPosition: string | null;
   reviewNextPractice: string | null;
   reviewEmploymentOffer: string | null;
   reviewSuggestions: string | null;
   reviewGrade: string | null;
   reportFileUrl: string | null;
+  /** Статус отчёта: draft, pending, approved, rejected, revised */
+  reportStatus: string;
+  /** Комментарий админа к отчёту */
+  reportComment: string | null;
   reportAdminApproved: boolean;
 }

@@ -7,15 +7,16 @@ import {
   fetchAdminDocumentsOverview,
   saveAdminReview,
   approveReport,
+  rejectReport,
   type AdminStudentDocumentInfo,
 } from "@/lib/api/documents";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -52,6 +53,8 @@ import {
   XCircle,
   FileText,
   ExternalLink,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -87,6 +90,7 @@ function ReviewDialog({
     reviewActivities: "",
     reviewCharacteristic: "",
     reviewEmployed: "",
+    reviewEmployedPosition: "",
     reviewNextPractice: "",
     reviewEmploymentOffer: "",
     reviewSuggestions: "",
@@ -115,9 +119,17 @@ function ReviewDialog({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const isAllFilled = Object.values(formData).every(
-    (v) => v !== null && v !== undefined && v !== "",
-  );
+  const isAllFilled = (() => {
+    const requiredFields = Object.keys(formData).filter((key) => key !== "reviewEmployedPosition");
+    const allRegularFilled = requiredFields.every(
+      (key) => formData[key as keyof typeof formData] !== null && formData[key as keyof typeof formData] !== undefined && formData[key as keyof typeof formData] !== "",
+    );
+    // Если трудоустроен, то поле должности обязательно
+    if (formData.reviewEmployed === "Да") {
+      return allRegularFilled && formData.reviewEmployedPosition !== "";
+    }
+    return allRegularFilled;
+  })();
 
   if (!student) return null;
 
@@ -135,7 +147,7 @@ function ReviewDialog({
         <div className="space-y-5 py-2">
           <div className="space-y-2">
             <Label htmlFor="reviewActivities">
-              Виды и объём работ, выполненных студентом
+              Студент осуществил следующие мероприятия:
             </Label>
             <Textarea
               id="reviewActivities"
@@ -147,7 +159,7 @@ function ReviewDialog({
 
           <div className="space-y-2">
             <Label htmlFor="reviewCharacteristic">
-              Характеристика работы студента
+              Краткая характеристика уровня подготовки и отношения практиканта к работе
             </Label>
             <Textarea
               id="reviewCharacteristic"
@@ -158,7 +170,7 @@ function ReviewDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Трудоустройство</Label>
+            <Label>Студент на время практики был трудоустроен?</Label>
             <Select
               value={formData.reviewEmployed}
               onValueChange={(v) => { if (v) updateField("reviewEmployed", v); }}
@@ -167,26 +179,43 @@ function ReviewDialog({
                 <SelectValue placeholder="Выберите..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Рекомендован к трудоустройству">Да — рекомендую</SelectItem>
-                <SelectItem value="Не рекомендован">Нет</SelectItem>
+                <SelectItem value="Да">Да</SelectItem>
+                <SelectItem value="Нет">Нет</SelectItem>
+              </SelectContent>
+            </Select>
+            {formData.reviewEmployed === "Да" && (
+              <div className="mt-2">
+                <Label htmlFor="reviewEmployedPosition">Должность</Label>
+                <Input
+                  id="reviewEmployedPosition"
+                  placeholder="Укажите должность..."
+                  value={formData.reviewEmployedPosition || ""}
+                  onChange={(e) => updateField("reviewEmployedPosition", e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="reviewNextPractice">
+              Студенту предложено пройти следующую практику на предприятии (в организации)?
+            </Label>
+            <Select
+              value={formData.reviewNextPractice}
+              onValueChange={(v) => { if (v) updateField("reviewNextPractice", v); }}
+            >
+              <SelectTrigger id="reviewNextPractice">
+                <SelectValue placeholder="Выберите..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Да">Да</SelectItem>
+                <SelectItem value="Нет">Нет</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reviewNextPractice">
-              Рекомендации по следующей практике
-            </Label>
-            <Textarea
-              id="reviewNextPractice"
-              value={formData.reviewNextPractice}
-              onChange={(e) => updateField("reviewNextPractice", e.target.value)}
-              rows={2}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Предложение о работе</Label>
+            <Label>Студенту предложено трудоустройство после завершения обучения?</Label>
             <Select
               value={formData.reviewEmploymentOffer}
               onValueChange={(v) => { if (v) updateField("reviewEmploymentOffer", v); }}
@@ -195,26 +224,26 @@ function ReviewDialog({
                 <SelectValue placeholder="Выберите..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Предложена позиция">Да</SelectItem>
-                <SelectItem value="Не предложена">Нет</SelectItem>
+                <SelectItem value="Да">Да</SelectItem>
+                <SelectItem value="Нет">Нет</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="reviewSuggestions">
-              Замечания и предложения
+              Предложения и замечания от организации по теоретической и практической подготовке студентов (В свободной форме)
             </Label>
             <Textarea
               id="reviewSuggestions"
               value={formData.reviewSuggestions}
               onChange={(e) => updateField("reviewSuggestions", e.target.value)}
-              rows={2}
+              rows={3}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reviewGrade">Оценка</Label>
+            <Label htmlFor="reviewGrade">Оценка за практику (по 10-балльной шкале)</Label>
             <Select
               value={formData.reviewGrade}
               onValueChange={(v) => { if (v) updateField("reviewGrade", v); }}
@@ -223,8 +252,8 @@ function ReviewDialog({
                 <SelectValue placeholder="Оценка" />
               </SelectTrigger>
               <SelectContent>
-                {["Отлично", "Хорошо", "Удовлетворительно"].map((grade) => (
-                  <SelectItem key={grade} value={grade}>
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((grade) => (
+                  <SelectItem key={grade} value={String(grade)}>
                     {grade}
                   </SelectItem>
                 ))}
@@ -272,47 +301,68 @@ function ReportDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
-  const [approved, setApproved] = useState(student?.reportStatus === "approved");
+  const [approveComment, setApproveComment] = useState("");
+  const [rejectComment, setRejectComment] = useState("");
+  const [action, setAction] = useState<"approve" | "reject" | null>(null);
   const [downloading, setDownloading] = useState(false);
 
-  // Синхронизация при открытии диалога для другого студента
-  if (student && approved !== (student.reportStatus === "approved")) {
-    setApproved(student.reportStatus === "approved");
-  }
-
   const approveMutation = useMutation({
-    mutationFn: (value: boolean) =>
-      approveReport(student!.userId, cohortId, value),
+    mutationFn: ({ comment }: { comment: string }) =>
+      approveReport(student!.userId, cohortId, comment || undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-students", cohortId] });
-      toast.success("Статус обновлён");
+      toast.success("Отчёт принят");
+      onOpenChange(false);
     },
     onError: () => {
-      toast.error("Ошибка при обновлении статуса");
+      toast.error("Ошибка при принятии отчёта");
     },
   });
 
-  const handleToggleApproval = (value: boolean) => {
-    setApproved(value);
-    approveMutation.mutate(value);
-  };
+  const rejectMutation = useMutation({
+    mutationFn: ({ comment }: { comment: string }) =>
+      rejectReport(student!.userId, cohortId, comment),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-students", cohortId] });
+      toast.success("Отчёт отклонён");
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast.error("Ошибка при отклонении отчёта");
+    },
+  });
 
   const handleDownload = async () => {
     if (!student?.reportFileUrl || downloading) return;
     setDownloading(true);
     try {
-      const fileName = student.reportFileUrl.replace(/^.*[/\\]/, "").replace(/^\//, "");
+      let fileName = student.reportFileUrl.replace(/^.*[/\\]/, "").replace(/^\//, "");
       const { getAccessToken } = await import("@/lib/api/token-strategy");
       const token = getAccessToken();
-      const res = await fetch(`/api/uploads/${fileName}`, {
+      const res = await fetch(`/uploads/${fileName}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error("Download failed");
       const blob = await res.blob();
+      // Если в имени нет расширения — определяем из Content-Type
+      if (!fileName.includes(".")) {
+        const contentType = res.headers.get("content-type") || blob.type;
+        const extMap: Record<string, string> = {
+          "application/pdf": ".pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+          "application/msword": ".doc",
+          "application/vnd.ms-excel": ".xls",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+          "image/png": ".png",
+          "image/jpeg": ".jpg",
+          "text/plain": ".txt",
+        };
+        fileName += extMap[contentType] || "";
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = fileName || "report.docx";
+      a.download = fileName || "report";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -326,6 +376,11 @@ function ReportDialog({
 
   if (!student) return null;
 
+      const status = student.reportStatus;
+      const isPending = (status === "pending" || status === "revised" || status === "draft");
+  const isApproved = status === "approved";
+  const isRejected = status === "rejected";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -335,6 +390,7 @@ function ReportDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Файл отчёта */}
           <div className="space-y-2">
             <Label>Файл отчёта</Label>
             {student.reportFileUrl ? (
@@ -356,22 +412,149 @@ function ReportDialog({
             )}
           </div>
 
+          {/* Статус */}
           <div className="space-y-2">
-            <Label>Допуск к скачиванию титульного листа</Label>
-            <div className="flex items-center gap-3">
-              <Switch
-                checked={approved}
-                onCheckedChange={handleToggleApproval}
-                disabled={approveMutation.isPending}
-              />
-              <span className="text-sm">
-                {approved ? "Допущен" : "Не допущен"}
-              </span>
+            <Label>Статус отчёта</Label>
+            <div>
+              {isApproved ? (
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Принят
+                </Badge>
+              ) : isRejected ? (
+                <Badge variant="destructive" className="gap-1">
+                  <XCircle className="h-3 w-3" />
+                  Отклонён
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="gap-1">
+                  На проверке
+                </Badge>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Включите, чтобы студент мог скачать титульный лист отчёта
-            </p>
           </div>
+
+          {/* Комментарий (если есть) */}
+          {student.reportComment && (
+            <div className="space-y-2">
+              <Label>Комментарий</Label>
+              <p className="text-sm rounded-lg bg-muted p-3">
+                {student.reportComment}
+              </p>
+            </div>
+          )}
+
+          {/* Действия: принять / отклонить */}
+          {isPending && student.reportFileUrl && (
+            <div className="space-y-4 border-t pt-4">
+              {action === "approve" && (
+                <div className="space-y-2">
+                  <Label htmlFor="approveComment">
+                    Комментарий (необязательно)
+                  </Label>
+                  <Textarea
+                    id="approveComment"
+                    value={approveComment}
+                    onChange={(e) => setApproveComment(e.target.value)}
+                    placeholder="Дополнительная информация для студента..."
+                    rows={2}
+                  />
+                </div>
+              )}
+
+              {action === "reject" && (
+                <div className="space-y-2">
+                  <Label htmlFor="rejectComment">
+                    Причина отклонения <span className="text-destructive">*</span>
+                  </Label>
+                  <Textarea
+                    id="rejectComment"
+                    value={rejectComment}
+                    onChange={(e) => setRejectComment(e.target.value)}
+                    placeholder="Укажите, что нужно исправить..."
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {!action && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    className="flex-1 gap-1"
+                    onClick={() => setAction("approve")}
+                  >
+                    <ThumbsUp className="h-4 w-4" />
+                    Принять
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1 gap-1"
+                    onClick={() => setAction("reject")}
+                  >
+                    <ThumbsDown className="h-4 w-4" />
+                    Отклонить
+                  </Button>
+                </div>
+              )}
+
+              {action === "approve" && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setAction(null);
+                      setApproveComment("");
+                    }}
+                  >
+                    Назад
+                  </Button>
+                  <Button
+                    variant="default"
+                    className="flex-1 gap-1"
+                    onClick={() => approveMutation.mutate({ comment: approveComment })}
+                    disabled={approveMutation.isPending}
+                  >
+                    {approveMutation.isPending ? "Сохранение..." : "Подтвердить"}
+                  </Button>
+                </div>
+              )}
+
+              {action === "reject" && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setAction(null);
+                      setRejectComment("");
+                    }}
+                  >
+                    Назад
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1 gap-1"
+                    onClick={() => rejectMutation.mutate({ comment: rejectComment })}
+                    disabled={rejectMutation.isPending || !rejectComment.trim()}
+                  >
+                    {rejectMutation.isPending ? "Сохранение..." : "Отклонить"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Для одобренных — сообщение, что титульный лист доступен студенту */}
+          {isApproved && (
+            <Alert>
+              <CheckCircle2 className="h-4 w-4" />
+              <AlertDescription>
+                Отчёт принят. Студент может скачать титульный лист отчёта.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <DialogFooter>
@@ -468,9 +651,15 @@ export default function AdminDocumentsPage() {
                   </TableCell>
                   <TableCell className="text-center">
                     {student.reportUploaded ? (
-                      <Badge variant="outline" className="gap-1">
-                        <CheckCircle2 className="h-3 w-3 text-green-600" />
-                        {student.reportStatus === "approved" ? "Одобрен" : "Загружен"}
+                      <Badge variant={student.reportStatus === "approved" ? "default" : student.reportStatus === "rejected" ? "destructive" : "secondary"} className="gap-1">
+                        {student.reportStatus === "approved" ? (
+                          <CheckCircle2 className="h-3 w-3" />
+                        ) : student.reportStatus === "rejected" ? (
+                          <XCircle className="h-3 w-3" />
+                        ) : (
+                          <AlertCircle className="h-3 w-3" />
+                        )}
+                        {student.reportStatus === "approved" ? "Принят" : student.reportStatus === "rejected" ? "Отклонён" : "На проверке"}
                       </Badge>
                     ) : (
                       <Badge variant="secondary" className="gap-1">

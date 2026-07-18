@@ -1,9 +1,19 @@
 import { Router } from 'express';
 import multer from 'multer';
+import path from 'path';
+import crypto from 'crypto';
 import { documentController } from '../controllers/document.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 
-const upload = multer({ dest: 'uploads/' });
+const storage = multer.diskStorage({
+  destination: 'uploads/',
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const name = crypto.randomUUID() + ext;
+    cb(null, name);
+  },
+});
+const upload = multer({ storage });
 const router = Router();
 
 router.use(authMiddleware);

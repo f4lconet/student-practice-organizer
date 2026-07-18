@@ -50,6 +50,52 @@ router.use(requireRole(['ADMIN']));
  *       200:
  *         description: Документ подтверждён
  */
+/**
+ * @swagger
+ * /admin/documents/{userId}/{cohortId}/review:
+ *   patch:
+ *     summary: Сохранить отзыв (админ)
+ *     tags: [Admin Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: cohortId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reviewActivities:
+ *                 type: string
+ *               reviewCharacteristic:
+ *                 type: string
+ *               reviewEmployed:
+ *                 type: string
+ *               reviewNextPractice:
+ *                 type: string
+ *               reviewEmploymentOffer:
+ *                 type: string
+ *               reviewSuggestions:
+ *                 type: string
+ *               reviewGrade:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Отзыв сохранён
+ */
+router.patch('/:userId/:cohortId/review', adminDocumentController.setReview);
+
 router.patch('/:userId/:cohortId/:type/approve', adminDocumentController.approveDocument);
 
 /**

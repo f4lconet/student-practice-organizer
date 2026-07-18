@@ -5,7 +5,7 @@ import { taskCardRepository } from '../repositories/taskCard.repository.js';
 import { NotFoundError } from '../errors/index.js';
 
 const INDIVIDUAL_FIELDS = ['studentFio', 'group', 'directionCode', 'directionName', 'programName', 'practiceTopic', 'mainStageTasks'];
-const TITLE_FIELDS = ['studentFio', 'group', 'specialty', 'practiceTopic'];
+const TITLE_FIELDS = ['studentFio', 'group', 'directionCode', 'directionName', 'practiceTopic'];
 const REVIEW_FIELDS = ['reviewActivities', 'reviewCharacteristic', 'reviewEmployed', 'reviewNextPractice', 'reviewEmploymentOffer', 'reviewSuggestions', 'reviewGrade'];
 
 function checkFieldsFilled(doc: Record<string, unknown> | null, fields: string[]): boolean {
@@ -49,6 +49,7 @@ export const adminOverviewService = {
         const docRecord = (doc ? doc : null) as Record<string, unknown> | null;
         const userName = getUserNameFromApplication(application);
         const reportFileUrl = docRecord ? (docRecord.reportFileUrl as string) || null : null;
+        const reportComment = docRecord ? (docRecord.reportComment as string) || null : null;
 
         return {
           userId: application.user.id,
@@ -58,6 +59,7 @@ export const adminOverviewService = {
           status: application.status,
           docExists: !!doc,
           reportFileUrl,
+          reportComment,
           individualTaskFieldsFilled: checkFieldsFilled(docRecord, INDIVIDUAL_FIELDS),
           titlePageFieldsFilled: checkFieldsFilled(docRecord, TITLE_FIELDS),
           reviewFieldsFilled: checkFieldsFilled(docRecord, REVIEW_FIELDS),
