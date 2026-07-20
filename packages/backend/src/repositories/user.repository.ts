@@ -102,6 +102,13 @@ export const userRepository = {
     });
   },
 
+  async updatePassword(userId: string, passwordHash: string): Promise<User> {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+  },
+
   async resetPassword(userId: string, passwordHash: string): Promise<User> {
     return prisma.user.update({
       where: { id: userId },

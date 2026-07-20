@@ -53,8 +53,10 @@ export const taskCardController = {
   async create(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { cohortId, date, title, description, artifactLink } = req.body;
+      // Админ может указать userId в теле запроса для создания задачи за другого пользователя
+      const userId = (req.user!.role === 'ADMIN' && req.body.userId) ? req.body.userId : req.user!.id;
       const task = await taskCardService.create({
-        userId: req.user!.id,
+        userId,
         cohortId,
         date,
         title,

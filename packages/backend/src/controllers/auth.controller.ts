@@ -111,4 +111,24 @@ export const authController = {
       next(err);
     }
   },
+
+  /** Смена пароля авторизованным пользователем (требуется старый пароль) */
+  async changePassword(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        throw new ValidationError('Старый и новый пароль обязательны');
+      }
+      if (typeof newPassword !== 'string' || newPassword.length < 8) {
+        throw new ValidationError('Новый пароль должен быть не короче 8 символов');
+      }
+
+      await authService.changePassword(req.user!.id, currentPassword, newPassword);
+
+      res.json({ message: 'Пароль успешно изменён' });
+    } catch (err) {
+      next(err);
+    }
+  },
 };

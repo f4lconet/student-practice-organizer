@@ -246,6 +246,22 @@ export const authService = {
     await userRepository.resetPassword(user.id, passwordHash);
   },
 
+  /** Смена пароля авторизованным пользователем (проверка старого пароля) */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new ValidationError('Неверный текущий пароль');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await userRepository.updatePassword(userId, passwordHash);
+  },
+
   generateVerificationToken(): string {
     return crypto.randomBytes(32).toString('hex');
   },

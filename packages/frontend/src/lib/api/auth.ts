@@ -115,3 +115,14 @@ export function resetPassword(token: string, password: string) {
     { skipAuth: true },
   );
 }
+
+/**
+ * Сменить пароль авторизованным пользователем.
+ * POST /api/auth/change-password
+ */
+export function changePassword(currentPassword: string, newPassword: string) {
+  return apiClient.post<{ message: string }>("/auth/change-password", {
+    currentPassword,
+    newPassword,
+  });
+}

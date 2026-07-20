@@ -345,4 +345,33 @@ router.post('/reset-password', authController.resetPassword);
  */
 router.get('/me', authMiddleware, authController.me);
 
+/**
+ * @swagger
+ * /auth/change-password:
+ *   post:
+ *     summary: Сменить пароль (авторизованный пользователь)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currentPassword, newPassword]
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 8
+ *     responses:
+ *       200:
+ *         description: Пароль успешно изменён
+ *       400:
+ *         description: Неверный текущий пароль или ошибка валидации
+ */
+router.post('/change-password', authMiddleware, authController.changePassword);
+
 export default router;

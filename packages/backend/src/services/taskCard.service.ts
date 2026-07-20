@@ -3,6 +3,14 @@ import { studentDocumentDataRepository } from '../repositories/studentDocumentDa
 import { cohortRepository } from '../repositories/cohort.repository.js';
 import { NotFoundError, ForbiddenError, ValidationError } from '../errors/index.js';
 
+/** Format a Date to yyyy-MM-dd using local timezone */
+function formatDateLocal(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function getWeekWorkdays(weekStart: Date): Date[] {
   const days: Date[] = [];
   const cursor = new Date(weekStart);
@@ -11,6 +19,14 @@ function getWeekWorkdays(weekStart: Date): Date[] {
     cursor.setDate(cursor.getDate() + 1);
   }
   return days;
+}
+
+/** Normalize a task's date to a yyyy-MM-dd string for safe JSON serialization */
+function dateToDateStr(value: Date | string | undefined | null): string {
+  if (!value) return '';
+  const d = typeof value === 'string' ? new Date(value) : value;
+  if (isNaN(d.getTime())) return String(value);
+  return formatDateLocal(d);
 }
 
 export const taskCardService = {
@@ -56,14 +72,24 @@ export const taskCardService = {
 
     // Build workdays with their tasks
     const workdaysWithTasks = validWorkdays.map((day) => {
-      const dayStr = day.toISOString().split('T')[0];
+      const dayStr = formatDateLocal(day);
       const dayTasks = tasks.filter((t) => {
-        const tDayStr = t.date.toISOString().split('T')[0];
-        return tDayStr === dayStr;
+        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+        return formatDateLocal(tDate) === dayStr;
       });
       return {
-        date: day.toISOString().split('T')[0],
-        tasks: dayTasks,
+        date: dayStr,
+        tasks: dayTasks.map((t) => ({
+          id: t.id,
+          userId: t.userId,
+          cohortId: t.cohortId,
+          date: dateToDateStr(t.date),
+          title: t.title,
+          description: t.description,
+          artifactLink: t.artifactLink,
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt,
+        })),
       };
     });
 
@@ -130,18 +156,20 @@ export const taskCardService = {
       const userName = userFioMap.get(userId) || userEmail;
 
       const workdaysWithTasks = validWorkdays.map((day) => {
-        const dayStr = day.toISOString().split('T')[0];
+        const dayStr = formatDateLocal(day);
         const dayTasks = userTasks.filter((t) => {
-          const tDayStr = t.date.toISOString().split('T')[0];
-          return tDayStr === dayStr;
+          const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+          return formatDateLocal(tDate) === dayStr;
         });
         return {
           date: dayStr,
           tasks: dayTasks.map((t) => ({
             id: t.id,
+            userId: t.userId,
             title: t.title,
             description: t.description,
             artifactLink: t.artifactLink,
+            date: dateToDateStr(t.date),
             createdAt: t.createdAt,
             updatedAt: t.updatedAt,
           })),
@@ -198,6 +226,17 @@ export const taskCardService = {
     const dayOfWeek = taskDate.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       throw new ValidationError('Tasks can only be created for workdays (Mon-Fri)');
+    }
+
+    // Check that user doesn't already have a task on this date (one task per day)
+    const existingTasks = await taskCardRepository.findByUserAndRange(
+      data.userId,
+      data.cohortId,
+      taskDate,
+      taskDate,
+    );
+    if (existingTasks.length > 0) {
+      throw new ValidationError('На этот день уже есть задача. Можно создать только одну задачу в день.');
     }
 
     // Convert empty strings to undefined to avoid Prisma errors

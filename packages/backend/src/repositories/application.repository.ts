@@ -33,7 +33,7 @@ export const applicationRepository = {
   async findAllByUser(userId: string) {
     return prisma.application.findMany({
       where: { userId },
-      include: { cohort: true, role: true },
+      include: { cohort: true, role: true, fieldValues: { include: { field: true } } },
       orderBy: { createdAt: 'desc' },
     });
   },

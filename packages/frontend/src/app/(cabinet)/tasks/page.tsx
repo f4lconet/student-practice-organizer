@@ -17,10 +17,19 @@ import { fetchCohort, fetchActiveCohort } from "@/lib/api/cohorts";
 import { fetchCohortParticipants } from "@/lib/api/participants";
 import { MultiParticipantGrid } from "@/features/tasks/multi-participant-grid";
 import { TaskCardDialog } from "@/features/tasks/task-card-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { AlertCircle, Users } from "lucide-react";
 import type { TaskCard } from "@/entities";
 
@@ -38,6 +47,13 @@ export default function CabinetTasksPage() {
   const [dialogDate, setDialogDate] = useState<string | null>(null);
   const [dialogParticipantUserId, setDialogParticipantUserId] = useState<string | null>(null);
   const [dialogParticipantName, setDialogParticipantName] = useState<string | undefined>(undefined);
+
+  // Delete confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<TaskCard | null>(null);
+
+  // readOnly = true при клике на задачу (просмотр), false при клике на "+" (создание)
+  const [dialogReadOnly, setDialogReadOnly] = useState(false);
 
   const weekStartStr = format(currentWeekStart, "yyyy-MM-dd");
 
@@ -110,7 +126,10 @@ export default function CabinetTasksPage() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       setDialogOpen(false);
     },
-    onError: () => toast.error("Ошибка при создании задачи"),
+    onError: (err) => {
+      const message = err instanceof Error ? err.message : "Ошибка при создании задачи";
+      toast.error(message);
+    },
   });
 
   const updateMutation = useMutation({
@@ -129,6 +148,8 @@ export default function CabinetTasksPage() {
     onSuccess: () => {
       toast.success("Задача удалена");
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setDeleteDialogOpen(false);
+      setTaskToDelete(null);
       setDialogOpen(false);
     },
     onError: () => toast.error("Ошибка при удалении задачи"),
@@ -142,22 +163,50 @@ export default function CabinetTasksPage() {
     setCurrentWeekStart((prev) => addWeeks(prev, 1));
   }, []);
 
+  // Клик на карточку задачи — открываем readOnly (полная информация, не редактирование)
+  // Клик на "+" — открываем форму создания
   const handleCellClick = useCallback(
     (date: string, task: TaskCard | null, participantUserId: string) => {
       setDialogTask(task);
       setDialogDate(date);
       setDialogParticipantUserId(participantUserId);
-      // Ищем ФИО
       const participant = allParticipants.find((p) => p.userId === participantUserId);
       setDialogParticipantName(participant?.userName);
+      // Клик на задачу → readOnly; клик на "+" (task===null) → режим редактирования
+      setDialogReadOnly(task !== null);
       setDialogOpen(true);
     },
     [allParticipants],
   );
 
+  // Клик на иконку редактирования — открываем в режиме редактирования
+  const handleEditTask = useCallback(
+    (task: TaskCard) => {
+      setDialogTask(task);
+      setDialogDate(task.date);
+      setDialogParticipantUserId(task.userId);
+      const participant = allParticipants.find((p) => p.userId === task.userId);
+      setDialogParticipantName(participant?.userName);
+      setDialogReadOnly(false);
+      setDialogOpen(true);
+    },
+    [allParticipants],
+  );
+
+  // Клик на иконку удаления — открываем подтверждение
+  const handleDeleteTask = useCallback((task: TaskCard) => {
+    setTaskToDelete(task);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (taskToDelete) {
+      deleteMutation.mutate(taskToDelete.id);
+    }
+  }, [taskToDelete, deleteMutation]);
+
   const handleSave = useCallback(
     (data: { title: string; description: string; artifactLink: string | null }) => {
-      // Отправляем только непустые поля, чтобы не ломать бэкенд
       const payload: { title: string; description?: string; artifactLink?: string } = {
         title: data.title,
       };
@@ -180,8 +229,9 @@ export default function CabinetTasksPage() {
     [deleteMutation],
   );
 
-  const isDialogReadOnly =
-    dialogParticipantUserId !== null && dialogParticipantUserId !== userId;
+  // readOnly = true при клике на задачу (просмотр), false при клике на "+" (создание)
+  // Для чужой задачи readOnly всегда true
+  const isDialogReadOnly = dialogReadOnly || (dialogParticipantUserId !== null && dialogParticipantUserId !== userId);
 
   if (isLoading) {
     return (
@@ -254,6 +304,8 @@ export default function CabinetTasksPage() {
         onPrevWeek={handlePrevWeek}
         onNextWeek={handleNextWeek}
         onCellClick={handleCellClick}
+        onEditTask={handleEditTask}
+        onDeleteTask={handleDeleteTask}
       />
 
       <TaskCardDialog
@@ -264,8 +316,34 @@ export default function CabinetTasksPage() {
         readOnly={isDialogReadOnly}
         participantName={dialogParticipantName}
         onSave={handleSave}
-        onDelete={handleDelete}
       />
+
+      {/* Диалог подтверждения удаления */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Удалить задачу?</DialogTitle>
+            <DialogDescription>
+              Вы уверены, что хотите удалить задачу "{taskToDelete?.title}"?
+              Это действие нельзя отменить.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+            >
+              Удалить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
