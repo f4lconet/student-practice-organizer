@@ -101,6 +101,7 @@ model Application {
   role              CohortRole?       @relation(fields: [roleId], references: [id])
   fieldValues       SurveyFieldValue[]
   studentDocument   StudentDocumentData?
+  testTaskSubmission TestTaskSubmission?
 
   @@index([cohortId]) 
   @@index([status])
