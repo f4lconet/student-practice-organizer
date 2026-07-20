@@ -6,9 +6,9 @@ COPY . .
 
 RUN npm install
 
-RUN npm run build
-
 RUN cd packages/backend && npx prisma generate && npx prisma migrate deploy
+
+RUN npm run build
 
 RUN apk add --no-cache nginx supervisor
 
