@@ -6,7 +6,7 @@ COPY . .
 
 RUN npm install
 
-RUN cd packages/backend && npx prisma generate && npx prisma migrate deploy
+RUN cd packages/backend && npx prisma generate
 
 RUN npm run build
 
