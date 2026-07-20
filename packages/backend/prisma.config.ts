@@ -7,4 +7,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   engine: "classic",
+  datasource: {
+    url:
+      process.env.DATABASE_URL ??
+      "postgresql://dummy:dummy@localhost:5432/dummy",
+  },
 });
