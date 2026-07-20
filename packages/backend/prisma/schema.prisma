@@ -130,9 +130,26 @@ model TestTask {
   updatedAt         DateTime          @updatedAt
   
   cohort            Cohort            @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  submissions       TestTaskSubmission[]
   
   @@index([publishedAt])
   @@map("test_tasks")
+}
+
+model TestTaskSubmission {
+  id              String    @id @default(cuid())
+  testTaskId      String
+  applicationId   String    @unique
+  content         String    
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  testTask      TestTask    @relation(fields: [testTaskId], references: [id], onDelete: Cascade)
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([testTaskId])
+  @@index([applicationId])
+  @@map("test_task_submissions")
 }
 
 model StudentDocumentData {

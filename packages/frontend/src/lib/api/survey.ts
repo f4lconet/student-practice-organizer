@@ -28,6 +28,14 @@ export function fetchPublicActiveCohort() {
 }
 
 /**
+ * Получить список когорт, принимающих заявки (публичный эндпоинт).
+ * GET /api/public/cohorts/accepting
+ */
+export function fetchPublicAcceptingCohorts() {
+  return apiClient.get<Cohort[]>("/public/cohorts/accepting", { skipAuth: true });
+}
+
+/**
  * Получить поля анкеты для активной когорты (публичный эндпоинт).
  * GET /api/public/cohorts/:id/survey
  */

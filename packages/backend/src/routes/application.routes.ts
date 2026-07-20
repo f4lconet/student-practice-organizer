@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { applicationController } from '../controllers/application.controller.js';
 import { testTaskController } from '../controllers/testTask.controller.js';
+import { testTaskSubmissionController } from '../controllers/testTaskSubmission.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -170,5 +171,60 @@ router.get('/prefill', applicationController.getPrefill);
  *         description: Заявка не найдена
  */
 router.get('/:id/test-task', testTaskController.getForApplication);
+
+/**
+ * @swagger
+ * /applications/{applicationId}/test-task/submission:
+ *   get:
+ *     summary: Получить своё решение тестового задания
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: applicationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Объект с полем submission или null
+ */
+router.get('/:applicationId/test-task/submission', testTaskSubmissionController.getMySubmission);
+
+/**
+ * @swagger
+ * /applications/{applicationId}/test-task/submit:
+ *   post:
+ *     summary: Отправить решение тестового задания
+ *     tags: [Applications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: applicationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - content
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Решение сохранено
+ *       403:
+ *         description: Доступ запрещён или задание не опубликовано
+ *       404:
+ *         description: Заявка не найдена
+ */
+router.post('/:applicationId/test-task/submit', testTaskSubmissionController.submit);
 
 export default router;

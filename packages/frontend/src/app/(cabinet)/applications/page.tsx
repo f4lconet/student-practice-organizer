@@ -1,14 +1,20 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   fetchMyApplications,
   fetchPrefillData,
+  fetchApplicationTestTask,
   type ApplicationWithFieldValues,
 } from "@/lib/api/applications";
-import { fetchPublicActiveCohort } from "@/lib/api/survey";
+import {
+  fetchMyTestTaskSubmission,
+  submitTestTaskSolution,
+  type TestTaskSubmission,
+} from "@/lib/api/test-task-submission";
+import { fetchPublicAcceptingCohorts } from "@/lib/api/survey";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +35,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertCircle,
   FileText,
@@ -36,8 +43,15 @@ import {
   Calendar,
   MessageSquare,
   Eye,
+  Building2,
+  ChevronRight,
+  ClipboardList,
+  Send,
+  CheckCircle2,
 } from "lucide-react";
 import type { ApplicationStatus } from "@/entities";
+import type { Cohort } from "@/entities/cohort";
+import { toast } from "sonner";
 
 const statusLabels: Record<ApplicationStatus, string> = {
   pending: "На рассмотрении",
@@ -51,6 +65,61 @@ const statusVariants: Record<ApplicationStatus, "secondary" | "default" | "destr
   rejected: "destructive",
 };
 
+// ---- Cohort Selection Dialog ----
+function CohortSelectDialog({
+  acceptingCohorts,
+  open,
+  onOpenChange,
+  onSelect,
+}: {
+  acceptingCohorts: Cohort[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (cohort: Cohort) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[450px]">
+        <DialogHeader>
+          <DialogTitle>Выберите когорту</DialogTitle>
+          <DialogDescription>
+            Когорты, которые сейчас принимают заявки
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 py-2">
+          {acceptingCohorts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Сейчас нет когорт с открытым приёмом заявок.
+            </p>
+          ) : (
+            acceptingCohorts.map((cohort) => (
+              <button
+                key={cohort.id}
+                onClick={() => onSelect(cohort)}
+                className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+              >
+                <Building2 className="h-5 w-5 shrink-0 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Когорта {cohort.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Приём до {formatDate(cohort.applicationEnd)}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            ))
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Закрыть
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleDateString("ru-RU", {
@@ -58,6 +127,136 @@ function formatDate(dateStr: string): string {
     month: "long",
     year: "numeric",
   });
+}
+
+// ---- Test Task Dialog ----
+function TestTaskDialog({
+  application,
+  open,
+  onOpenChange,
+}: {
+  application: ApplicationWithFieldValues | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [submissionContent, setSubmissionContent] = useState("");
+  const [showForm, setShowForm] = useState(false);
+
+  const testTaskQuery = useQuery({
+    queryKey: ["test-task", application?.id],
+    queryFn: () => fetchApplicationTestTask(application!.id),
+    enabled: open && !!application?.id,
+  });
+
+  const submissionQuery = useQuery({
+    queryKey: ["test-task-submission", application?.id],
+    queryFn: () => fetchMyTestTaskSubmission(application!.id),
+    enabled: open && !!application?.id && testTaskQuery.data?.published === true,
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: (content: string) =>
+      submitTestTaskSolution(application!.id, content),
+    onSuccess: () => {
+      toast.success("Решение отправлено");
+      setShowForm(false);
+      submissionQuery.refetch();
+    },
+    onError: () => {
+      toast.error("Ошибка при отправке решения");
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!submissionContent.trim()) return;
+    submitMutation.mutate(submissionContent);
+  };
+
+  if (!application) return null;
+
+  const { data: testTask } = testTaskQuery;
+  const { data: submissionData } = submissionQuery;
+  const existingSubmission = submissionData?.submission;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Тестовое задание</DialogTitle>
+          <DialogDescription>
+            {application.cohortName ?? "Когорта"}
+          </DialogDescription>
+        </DialogHeader>
+
+        {testTaskQuery.isLoading ? (
+          <p className="py-4 text-sm text-muted-foreground">Загрузка...</p>
+        ) : testTask?.published ? (
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg border bg-muted/30 p-4 whitespace-pre-wrap text-sm">
+              {testTask.content}
+            </div>
+
+            {existingSubmission ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Решение отправлено</span>
+                </div>
+                <Label>Ваше решение</Label>
+                <div className="rounded-lg border bg-muted/30 p-4 whitespace-pre-wrap text-sm">
+                  {existingSubmission.content}
+                </div>
+              </div>
+            ) : showForm ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="submission-content">Ваше решение</Label>
+                  <Textarea
+                    id="submission-content"
+                    value={submissionContent}
+                    onChange={(e) => setSubmissionContent(e.target.value)}
+                    placeholder="Напишите решение тестового задания..."
+                    rows={10}
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={submitMutation.isPending || !submissionContent.trim()}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    {submitMutation.isPending ? "Отправка..." : "Отправить"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowForm(false)}
+                  >
+                    Отмена
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button onClick={() => setShowForm(true)}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Отправить решение
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="py-4 text-sm text-muted-foreground">
+            Тестовое задание ещё не опубликовано
+          </p>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Закрыть
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // ---- Application Detail Dialog ----
@@ -117,6 +316,7 @@ function ApplicationDetailDialog({
 
 export default function CabinetApplicationsPage() {
   const [viewingApp, setViewingApp] = useState<ApplicationWithFieldValues | null>(null);
+  const [viewingTestTask, setViewingTestTask] = useState<ApplicationWithFieldValues | null>(null);
 
   const applicationsQuery = useQuery({
     queryKey: ["applications"],
@@ -134,16 +334,36 @@ export default function CabinetApplicationsPage() {
     prefillQuery.data?.data &&
     Object.keys(prefillQuery.data.data).length > 0;
 
-  // Получаем активную когорту для ссылки "Подать заявку"
-  const { data: activeCohort } = useQuery({
-    queryKey: ["public", "active-cohort"],
-    queryFn: () => fetchPublicActiveCohort().catch(() => null),
+  const router = useRouter();
+
+  // Получаем список когорт, принимающих заявки
+  const acceptingCohortsQuery = useQuery({
+    queryKey: ["public", "accepting-cohorts"],
+    queryFn: () => fetchPublicAcceptingCohorts().catch(() => [] as Cohort[]),
     staleTime: 5 * 60 * 1000,
   });
 
-  const surveyHref = activeCohort
-    ? `/survey/${activeCohort.name}`
-    : "/survey/current";
+  const acceptingCohorts: Cohort[] = acceptingCohortsQuery.data ?? [];
+
+  // Состояние диалога выбора когорты
+  const [cohortSelectOpen, setCohortSelectOpen] = useState(false);
+
+  const handleSelectCohort = (cohort: Cohort) => {
+    setCohortSelectOpen(false);
+    router.push(`/survey/${cohort.name}`);
+  };
+
+  const handleCohortClick = () => {
+    // Всегда открываем диалог выбора когорты, даже если когорта одна
+    setCohortSelectOpen(true);
+  };
+
+  const surveyButton = (
+    <Button onClick={handleCohortClick}>
+      <Plus className="mr-2 h-4 w-4" />
+      Подать заявку
+    </Button>
+  );
 
   if (applicationsQuery.isLoading) {
     return (
@@ -187,13 +407,15 @@ export default function CabinetApplicationsPage() {
             <br />
             Заявки принимаются в период приёма активной когорты.
           </p>
-          <Button
-            render={<Link href={surveyHref} />}
-            nativeButton={false}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Подать заявку
-          </Button>
+          {surveyButton}
+
+          {/* Диалог выбора когорты */}
+          <CohortSelectDialog
+            acceptingCohorts={acceptingCohorts}
+            open={cohortSelectOpen}
+            onOpenChange={setCohortSelectOpen}
+            onSelect={handleSelectCohort}
+          />
         </CardContent>
       </Card>
     );
@@ -210,13 +432,7 @@ export default function CabinetApplicationsPage() {
             Всего заявок: {applications.length}
           </p>
         </div>
-        <Button
-          render={<Link href={surveyHref} />}
-          nativeButton={false}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Подать заявку
-        </Button>
+        {surveyButton}
       </div>
 
       {hasPrefill && (
@@ -252,6 +468,14 @@ export default function CabinetApplicationsPage() {
                   >
                     <Eye className="h-3.5 w-3.5" />
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => setViewingTestTask(app)}
+                    title="Тестовое задание"
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" />
+                  </Button>
                   <Badge variant={statusVariants[app.status]}>
                     {statusLabels[app.status]}
                   </Badge>
@@ -275,12 +499,31 @@ export default function CabinetApplicationsPage() {
         ))}
       </div>
 
+      {/* Диалог выбора когорты */}
+      <CohortSelectDialog
+        acceptingCohorts={acceptingCohorts}
+        open={cohortSelectOpen}
+        onOpenChange={setCohortSelectOpen}
+        onSelect={handleSelectCohort}
+      />
+
       {/* Диалог просмотра данных заявки */}
       <ApplicationDetailDialog
         application={viewingApp}
         open={viewingApp !== null}
         onOpenChange={(open) => {
           if (!open) setViewingApp(null);
+        }}
+      />
+
+      {/* Диалог тестового задания */}
+      <TestTaskDialog
+        application={viewingTestTask}
+        open={viewingTestTask !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingTestTask(null);
+          }
         }}
       />
     </div>

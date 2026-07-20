@@ -14,7 +14,14 @@ import { useSurveyPage } from "@/features/survey/use-survey-page";
 import { buildSurveySchema } from "@/lib/form-utils";
 import type { TestTask } from "@/entities/test-task";
 import { useAuth } from "@/providers/auth-provider";
-import { AlertCircle, CheckCircle2, ArrowLeft, FileText, Clock, UserPlus } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ArrowLeft,
+  FileText,
+  Clock,
+  UserPlus,
+} from "lucide-react";
 
 export default function SurveyPage() {
   const params = useParams();

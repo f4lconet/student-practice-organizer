@@ -29,6 +29,28 @@ router.get('/cohorts/active', cohortController.findActive);
 
 /**
  * @swagger
+ * /public/cohorts/accepting:
+ *   get:
+ *     summary: Получить список когорт, принимающих заявки
+ *     description: |
+ *       Возвращает все когорты, у которых сейчас идёт приём заявок
+ *       (текущая дата попадает в диапазон applicationStart–applicationEnd).
+ *       Эндпоинт публичный — авторизация не требуется.
+ *     tags: [Public]
+ *     responses:
+ *       200:
+ *         description: Список когорт, принимающих заявки
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Cohort'
+ */
+router.get('/cohorts/accepting', cohortController.findAccepting);
+
+/**
+ * @swagger
  * /public/cohorts/{id}/survey:
  *   get:
  *     summary: Получить поля анкеты для когорты

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { cohortController } from '../controllers/cohort.controller.js';
 import { cohortRoleController } from '../controllers/cohortRole.controller.js';
 import { testTaskController } from '../controllers/testTask.controller.js';
+import { testTaskSubmissionController } from '../controllers/testTaskSubmission.controller.js';
 import { applicationController } from '../controllers/application.controller.js';
 import { documentController } from '../controllers/document.controller.js';
 import { adminOverviewController } from '../controllers/adminOverview.controller.js';
@@ -373,6 +374,26 @@ router.post('/:cohortId/test-task', cohortContextMiddleware, testTaskController.
  *         description: Тестовое задание опубликовано, уведомления отправлены
  */
 router.patch('/:cohortId/test-task/publish', cohortContextMiddleware, testTaskController.publish);
+
+/**
+ * @swagger
+ * /admin/cohorts/{cohortId}/test-task/submissions:
+ *   get:
+ *     summary: Получить решения тестового задания по когорте
+ *     tags: [Admin / Test Task]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: cohortId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Список решений с данными заявителей
+ */
+router.get('/:cohortId/test-task/submissions', cohortContextMiddleware, testTaskSubmissionController.getSubmissionsForCohort);
 
 /**
  * @swagger

@@ -11,6 +11,10 @@ import {
   rejectApplication,
   type AdminApplication,
 } from "@/lib/api/applications";
+import {
+  fetchAdminTestTaskSubmissions,
+  type TestTaskSubmissionWithApplication,
+} from "@/lib/api/test-task-submission";
 import { fetchCohortRoles } from "@/lib/api/cohorts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +60,7 @@ import {
   CheckCircle2,
   XCircle,
   MessageSquare,
+  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { ApplicationStatus } from "@/entities/application";
@@ -379,6 +384,65 @@ function RejectDialog({
   );
 }
 
+// ---- Test Task Submission Dialog ----
+function TestTaskSubmissionDialog({
+  submissions,
+  open,
+  onOpenChange,
+}: {
+  submissions: TestTaskSubmissionWithApplication[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Решения тестового задания</DialogTitle>
+          <DialogDescription>
+            Решения, отправленные кандидатами
+          </DialogDescription>
+        </DialogHeader>
+
+        {submissions.length === 0 ? (
+          <p className="py-4 text-sm text-muted-foreground">
+            Пока никто не отправил решение
+          </p>
+        ) : (
+          <div className="space-y-4 py-2">
+            {submissions.map((sub) => {
+              const fioField = sub.application.fieldValues.find(
+                (fv) => fv.field.label.toLowerCase() === "фио",
+              );
+              const userName = fioField?.value ?? sub.application.user?.email ?? "—";
+
+              return (
+                <div key={sub.id} className="rounded-lg border p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{userName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(sub.createdAt)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-muted/30 p-3 whitespace-pre-wrap text-sm">
+                    {sub.content}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Закрыть
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminApplicationsPage() {
   const params = useParams<{ cohortId: string }>();
   const cohortId = params.cohortId;
@@ -395,6 +459,13 @@ export default function AdminApplicationsPage() {
   const [rejectingApp, setRejectingApp] = useState<AdminApplication | null>(
     null,
   );
+  const [viewingSubmissions, setViewingSubmissions] = useState(false);
+
+  const { data: submissionsData } = useQuery({
+    queryKey: ["admin-test-task-submissions", cohortId],
+    queryFn: () => fetchAdminTestTaskSubmissions(cohortId),
+    enabled: viewingSubmissions,
+  });
 
   const {
     data: rawData,
@@ -461,13 +532,26 @@ export default function AdminApplicationsPage() {
     );
   }
 
+  const submissions: TestTaskSubmissionWithApplication[] = Array.isArray(submissionsData)
+    ? submissionsData
+    : [];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Заявки</h1>
-        <p className="text-muted-foreground">
-          Управление заявками кандидатов когорты
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Заявки</h1>
+          <p className="text-muted-foreground">
+            Управление заявками кандидатов когорты
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => setViewingSubmissions(true)}
+        >
+          <ClipboardList className="mr-2 h-4 w-4" />
+          Решения тестового задания
+        </Button>
       </div>
 
       {/* Фильтры */}
@@ -640,6 +724,13 @@ export default function AdminApplicationsPage() {
           if (!open) setRejectingApp(null);
         }}
         cohortId={cohortId}
+      />
+
+      {/* Диалог решений тестового задания */}
+      <TestTaskSubmissionDialog
+        submissions={submissions}
+        open={viewingSubmissions}
+        onOpenChange={setViewingSubmissions}
       />
     </div>
   );

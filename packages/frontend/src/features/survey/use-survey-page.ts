@@ -2,10 +2,10 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/providers/auth-provider";
-import { fetchPublicActiveCohort, fetchPublicSurveyFields, submitApplication } from "@/lib/api/survey";
+import { fetchPublicAcceptingCohorts, fetchPublicSurveyFields, submitApplication } from "@/lib/api/survey";
 import type { SurveyConfigResponse } from "@/lib/api/survey";
 import type { Application } from "@/entities";
 import type { TestTask } from "@/entities/test-task";
@@ -22,28 +22,43 @@ export function useSurveyPage(slug: string, options?: UseSurveyPageOptions) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
+  const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
 
-  // 1. Получаем активную когорту по публичному эндпоинту
-  const activeCohortQuery = useQuery({
-    queryKey: ["public", "active-cohort"],
-    queryFn: () => fetchPublicActiveCohort().catch(() => null),
+  // 1. Получаем список когорт, принимающих заявки
+  const acceptingCohortsQuery = useQuery({
+    queryKey: ["public", "accepting-cohorts"],
+    queryFn: () => fetchPublicAcceptingCohorts().catch(() => []),
     retry: 0,
     staleTime: 5 * 60 * 1000,
   });
 
-  const cohort: Cohort | null = activeCohortQuery.data ?? null;
+  const acceptingCohorts: Cohort[] = acceptingCohortsQuery.data ?? [];
 
-  // 2. Загружаем поля анкеты для этой когорты
+  // 2. Вычисляем когорту по умолчанию при загрузке списка
+  const defaultCohortId = useMemo(() => {
+    if (acceptingCohorts.length === 0) return null;
+    if (slug !== "current") {
+      const slugCohort = acceptingCohorts.find((c) => c.name === slug);
+      if (slugCohort) return slugCohort.id;
+    }
+    return acceptingCohorts[0].id;
+  }, [acceptingCohorts, slug]);
+
+  // Эффективный ID когорты: выбранная пользователем или по умолчанию
+  const effectiveCohortId = selectedCohortId ?? defaultCohortId;
+  const cohort: Cohort | null = acceptingCohorts.find((c) => c.id === effectiveCohortId) ?? null;
+
+  // 3. Загружаем поля анкеты для выбранной когорты
   const fieldsQuery = useQuery({
-    queryKey: ["public", "survey-fields", cohort?.id],
-    queryFn: () => fetchPublicSurveyFields(cohort!.id),
-    enabled: !!cohort,
+    queryKey: ["public", "survey-fields", effectiveCohortId],
+    queryFn: () => fetchPublicSurveyFields(effectiveCohortId!),
+    enabled: !!effectiveCohortId,
     staleTime: 5 * 60 * 1000,
   });
 
   const fields = fieldsQuery.data ?? [];
 
-  // 3. Отправка заявки
+  // 4. Отправка заявки
   const submitMutation = useMutation({
     mutationFn: (data: Record<string, string>) => {
       if (!cohort) throw new Error("Нет активной когорты");
@@ -93,13 +108,16 @@ export function useSurveyPage(slug: string, options?: UseSurveyPageOptions) {
     router.push("/applications");
   }, [router]);
 
-  const isLoadingConfig = activeCohortQuery.isLoading || fieldsQuery.isLoading;
-  const configError = activeCohortQuery.error ?? fieldsQuery.error;
+  const isLoadingConfig = acceptingCohortsQuery.isLoading || fieldsQuery.isLoading;
+  const configError = acceptingCohortsQuery.error ?? fieldsQuery.error;
   const isFieldsEmpty = fields.length === 0;
 
   return {
     fields,
     cohort,
+    acceptingCohorts,
+    effectiveCohortId,
+    setSelectedCohortId,
     isLoadingConfig,
     configError,
     isFieldsEmpty,
@@ -118,5 +136,15 @@ export function useSurveyPage(slug: string, options?: UseSurveyPageOptions) {
 
 function isWithinDates(start: string, end: string): boolean {
   const now = Date.now();
-  return now >= new Date(start).getTime() && now <= new Date(end).getTime();
+  // applicationEnd хранится как начало дня (00:00:00.000 UTC),
+  // поэтому весь день окончания приёма должен быть включён.
+  // Сравниваем с началом сегодняшнего дня в UTC.
+  const nowDate = new Date();
+  const startOfTodayUTC = Date.UTC(
+    nowDate.getUTCFullYear(),
+    nowDate.getUTCMonth(),
+    nowDate.getUTCDate(),
+    0, 0, 0, 0,
+  );
+  return now >= new Date(start).getTime() && startOfTodayUTC <= new Date(end).getTime();
 }

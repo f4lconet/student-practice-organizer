@@ -70,4 +70,13 @@ export const cohortController = {
       next(error);
     }
   },
+
+  async findAccepting(req: Request, res: Response, next: NextFunction) {
+    try {
+      const cohorts = await cohortService.findAccepting();
+      res.json(cohorts);
+    } catch (error) {
+      next(error);
+    }
+  },
 };

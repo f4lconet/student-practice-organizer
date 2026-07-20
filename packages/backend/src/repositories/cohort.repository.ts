@@ -48,10 +48,36 @@ export const cohortRepository = {
 
   async findActive(): Promise<Cohort | null> {
     const now = new Date();
+    // applicationEnd хранится как начало дня (00:00:00.000 UTC),
+    // поэтому сравниваем с началом сегодняшнего дня в UTC,
+    // чтобы весь день окончания приёма (до 23:59:59) был включён.
+    const startOfTodayUTC = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      0, 0, 0, 0,
+    ));
     return prisma.cohort.findFirst({
       where: {
         applicationStart: { lte: now },
-        applicationEnd: { gte: now },
+        applicationEnd: { gte: startOfTodayUTC },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  },
+
+  async findAccepting(): Promise<Cohort[]> {
+    const now = new Date();
+    const startOfTodayUTC = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      0, 0, 0, 0,
+    ));
+    return prisma.cohort.findMany({
+      where: {
+        applicationStart: { lte: now },
+        applicationEnd: { gte: startOfTodayUTC },
       },
       orderBy: { createdAt: 'desc' },
     });

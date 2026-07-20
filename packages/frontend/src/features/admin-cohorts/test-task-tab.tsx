@@ -16,6 +16,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Send, Save, CheckCircle2, Clock } from "lucide-react";
+import { toast } from "sonner";
 
 interface TestTaskTabProps {
   cohortId: string;
@@ -36,10 +37,12 @@ export function TestTaskTab({ cohortId }: TestTaskTabProps) {
       setIsContentDirty(false);
       setSaveError(null);
       setIsLoading(false);
+      toast.success("Тестовое задание успешно сохранено");
     },
     onError: () => {
       setSaveError("Ошибка при сохранении содержимого");
       setIsLoading(false);
+      toast.error("Ошибка при сохранении тестового задания");
     },
   });
 
@@ -48,9 +51,11 @@ export function TestTaskTab({ cohortId }: TestTaskTabProps) {
     onSuccess: () => {
       setIsPublished(true);
       queryClient.invalidateQueries({ queryKey: ["test-task", cohortId] });
+      toast.success("Тестовое задание успешно опубликовано");
     },
     onError: () => {
       setSaveError("Ошибка при публикации тестового задания");
+      toast.error("Ошибка при публикации тестового задания");
     },
   });
 

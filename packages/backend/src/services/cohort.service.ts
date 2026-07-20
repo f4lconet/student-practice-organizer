@@ -121,6 +121,10 @@ export const cohortService = {
     return activeCohort;
   },
 
+  async findAccepting() {
+    return cohortRepository.findAccepting();
+  },
+
   async delete(id: string) {
     const cohort = await cohortRepository.findById(id);
     if (!cohort) {
