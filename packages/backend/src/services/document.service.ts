@@ -6,6 +6,7 @@ import { mailService } from '../lib/mail.service.js';
 import { NotFoundError, ValidationError, ForbiddenError } from '../errors/index.js';
 import { StudentDocumentData } from '../generated/prisma/client.js';
 import { DocumentType, DocumentStatus } from '../types/document.types.js';
+import petrovich from 'petrovich';
 
 const REQUIRED_FIELDS: Record<'individual' | 'review' | 'title', string[]> = {
   individual: ['studentFio', 'group', 'directionCode', 'directionName', 'programName', 'practiceTopic', 'mainStageTasks'],
@@ -98,9 +99,25 @@ export const documentService = {
       'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
     ];
 
+    // Helper to split FIO into parts and decline to genitive case
+    const toGenitive = (fio: string | null): string => {
+      if (!fio) return '';
+      const parts = fio.trim().split(/\s+/);
+      if (parts.length < 2) return fio;
+      
+      // parts[0] = last name, parts[1] = first name, parts[2] = middle name (optional)
+      const last = parts[0];
+      const first = parts[1];
+      const middle = parts.length > 2 ? parts[2] : '';
+      
+      const declined = petrovich({ last, first, middle }, 'genitive');
+      return [declined.last, declined.first, declined.middle].filter(Boolean).join(' ');
+    };
+
     // Build data for template
     const templateData: Record<string, unknown> = {
       studentFio: doc.studentFio,
+      studentFioGenitive: toGenitive(doc.studentFio),
       group: doc.group,
       directionCode: doc.directionCode,
       directionName: doc.directionName,

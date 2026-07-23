@@ -1,10 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
-  addWeeks,
-  subWeeks,
-  startOfWeek,
   endOfWeek,
   eachDayOfInterval,
   isBefore,
@@ -12,10 +9,18 @@ import {
   format,
 } from "date-fns";
 import { ru } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ExternalLink, Pencil, Trash2, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { TaskCard, CohortParticipant } from "@/entities";
 
 interface MultiParticipantGridProps {
@@ -58,6 +63,9 @@ export function MultiParticipantGrid({
   onEditTask,
   onDeleteTask,
 }: MultiParticipantGridProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+
   const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
 
   const days = useMemo(() => {
@@ -69,10 +77,32 @@ export function MultiParticipantGrid({
   const canGoPrev = isBefore(practiceStart, currentWeekStart);
   const canGoNext = isAfter(practiceEnd, weekEnd);
 
+  // Get unique role names for filter dropdown
+  const roleOptions = useMemo(() => {
+    const roles = new Set<string>();
+    for (const p of participants) {
+      if (p.roleName) roles.add(p.roleName);
+    }
+    return Array.from(roles).sort();
+  }, [participants]);
+
+  // Filter participants by role and search query
+  const filteredParticipants = useMemo(() => {
+    let list = participants;
+    if (roleFilter !== "all") {
+      list = list.filter((p) => p.roleName === roleFilter);
+    }
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      list = list.filter((p) => p.userName.toLowerCase().includes(query));
+    }
+    return list;
+  }, [participants, roleFilter, searchQuery]);
+
   const visibleParticipants = useMemo(() => {
-    if (showAll) return participants;
+    if (showAll) return filteredParticipants;
     return participants.filter((p) => p.userId === currentUserId);
-  }, [participants, currentUserId, showAll]);
+  }, [participants, currentUserId, showAll, filteredParticipants]);
 
   const tasksByUserAndDate = useMemo(() => {
     const map = new Map<string, Map<string, TaskCard[]>>();
@@ -109,27 +139,6 @@ export function MultiParticipantGrid({
     return taskUserId === currentUserId;
   };
 
-  if (visibleParticipants.length === 0) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" size="sm" onClick={onPrevWeek} disabled={!canGoPrev}>
-            <ChevronLeft className="h-4 w-4" />
-            Предыдущая
-          </Button>
-          <span className="text-sm font-medium">{weekLabel}</span>
-          <Button variant="outline" size="sm" onClick={onNextWeek} disabled={!canGoNext}>
-            Следующая
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-        <p className="text-center text-sm text-muted-foreground py-8">
-          Нет участников для отображения
-        </p>
-      </div>
-    );
-  }
-
   const maxNameLength = Math.max(
     ...visibleParticipants.map((p) => p.userName.length),
     15,
@@ -140,6 +149,7 @@ export function MultiParticipantGrid({
 
   return (
     <div className="space-y-4">
+      {/* Навигация по неделям */}
       <div className="flex items-center justify-between">
         <Button variant="outline" size="sm" onClick={onPrevWeek} disabled={!canGoPrev}>
           <ChevronLeft className="h-4 w-4" />
@@ -152,7 +162,53 @@ export function MultiParticipantGrid({
         </Button>
       </div>
 
-      {/* Табличная вёрстка через CSS Grid */}
+      {/* Фильтры (только в режиме показа всех) */}
+      {showAll && (
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Поиск по имени */}
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Поиск по имени..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 pr-8"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Фильтр по роли */}
+          <Select value={roleFilter} onValueChange={(value) => { if (value) setRoleFilter(value); }}>
+            <SelectTrigger className="w-[180px]">
+              <span className="text-sm">
+                {roleFilter === "all" ? "Все роли" : roleFilter}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все роли</SelectItem>
+              {roleOptions.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {role}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {visibleParticipants.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-8">
+          Нет участников для отображения
+        </p>
+      ) : (
+      /* Табличная вёрстка через CSS Grid */
       <div className="overflow-auto border rounded-none">
         <div
           className="grid"
@@ -186,17 +242,22 @@ export function MultiParticipantGrid({
             const isOwnRow = participant.userId === currentUserId;
             const isLastRow = pIdx === visibleParticipants.length - 1;
 
-            // ФИО слева
+            // ФИО слева с ролью
             const nameCell = (
               <div
                 key={`name-${participant.userId}`}
-                className={`flex items-start p-2 text-sm font-medium border-r border-border ${
+                className={`flex flex-col justify-center p-2 text-sm border-r border-border ${
                   isOwnRow ? "bg-primary/5" : ""
                 } ${isLastRow ? "" : "border-b border-border"}`}
               >
-                <span className="truncate" title={participant.userName}>
+                <span className="truncate font-medium" title={participant.userName}>
                   {participant.userName}
                 </span>
+                {participant.roleName && (
+                  <span className="truncate text-[10px] text-muted-foreground mt-0.5">
+                    {participant.roleName}
+                  </span>
+                )}
               </div>
             );
 
@@ -292,6 +353,7 @@ export function MultiParticipantGrid({
           })}
         </div>
       </div>
+      )}
     </div>
   );
 }

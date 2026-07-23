@@ -42,6 +42,7 @@ export default function AdminTasksPage() {
   const [dialogReadOnly, setDialogReadOnly] = useState(true);
   const [dialogParticipantUserId, setDialogParticipantUserId] = useState<string | null>(null);
   const [dialogParticipantName, setDialogParticipantName] = useState<string | undefined>(undefined);
+  const [dialogParticipantRole, setDialogParticipantRole] = useState<string | undefined>(undefined);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<TaskCard | null>(null);
 
@@ -130,6 +131,7 @@ export default function AdminTasksPage() {
       setDialogParticipantUserId(participantUserId);
       const participant = participants.find((p) => p.userId === participantUserId);
       setDialogParticipantName(participant?.userName);
+      setDialogParticipantRole(participant?.roleName);
 
       if (editMode) {
         // В режиме редактирования клик на "+" (task===null) → создание
@@ -152,6 +154,7 @@ export default function AdminTasksPage() {
       setDialogParticipantUserId(task.userId);
       const participant = participants.find((p) => p.userId === task.userId);
       setDialogParticipantName(participant?.userName);
+      setDialogParticipantRole(participant?.roleName);
       setDialogReadOnly(false);
       setDialogOpen(true);
     },
@@ -279,6 +282,7 @@ export default function AdminTasksPage() {
         date={dialogDate}
         readOnly={isDialogReadOnly}
         participantName={dialogParticipantName}
+        participantRole={dialogParticipantRole}
         onSave={handleSave}
       />
 

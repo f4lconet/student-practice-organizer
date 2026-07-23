@@ -41,7 +41,7 @@ export const applicationRepository = {
   async findAllByCohort(cohortId: string) {
     return prisma.application.findMany({
       where: { cohortId },
-      include: { user: true, fieldValues: { include: { field: true } } },
+      include: { user: true, role: true, fieldValues: { include: { field: true } } },
       orderBy: { createdAt: 'desc' },
     });
   },

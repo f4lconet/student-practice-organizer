@@ -47,6 +47,7 @@ export default function CabinetTasksPage() {
   const [dialogDate, setDialogDate] = useState<string | null>(null);
   const [dialogParticipantUserId, setDialogParticipantUserId] = useState<string | null>(null);
   const [dialogParticipantName, setDialogParticipantName] = useState<string | undefined>(undefined);
+  const [dialogParticipantRole, setDialogParticipantRole] = useState<string | undefined>(undefined);
 
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -172,6 +173,7 @@ export default function CabinetTasksPage() {
       setDialogParticipantUserId(participantUserId);
       const participant = allParticipants.find((p) => p.userId === participantUserId);
       setDialogParticipantName(participant?.userName);
+      setDialogParticipantRole(participant?.roleName);
       // Клик на задачу → readOnly; клик на "+" (task===null) → режим редактирования
       setDialogReadOnly(task !== null);
       setDialogOpen(true);
@@ -187,6 +189,7 @@ export default function CabinetTasksPage() {
       setDialogParticipantUserId(task.userId);
       const participant = allParticipants.find((p) => p.userId === task.userId);
       setDialogParticipantName(participant?.userName);
+      setDialogParticipantRole(participant?.roleName);
       setDialogReadOnly(false);
       setDialogOpen(true);
     },
@@ -315,6 +318,7 @@ export default function CabinetTasksPage() {
         date={dialogDate}
         readOnly={isDialogReadOnly}
         participantName={dialogParticipantName}
+        participantRole={dialogParticipantRole}
         onSave={handleSave}
       />
 
@@ -324,7 +328,7 @@ export default function CabinetTasksPage() {
           <DialogHeader>
             <DialogTitle>Удалить задачу?</DialogTitle>
             <DialogDescription>
-              Вы уверены, что хотите удалить задачу "{taskToDelete?.title}"?
+              Вы уверены, что хотите удалить задачу {taskToDelete?.title}?
               Это действие нельзя отменить.
             </DialogDescription>
           </DialogHeader>

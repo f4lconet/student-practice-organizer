@@ -57,7 +57,7 @@ function createMinimalDocx(tags) {
 }
 
 const templates = {
-  'individual-task.docx': ['studentFio', 'group', 'directionCode', 'directionName', 'programName', 'specialty', 'practiceTopic', 'mainStageTasks', 'practiceStart', 'practiceEnd'],
+  'individual-task.docx': ['studentFio', 'studentFioGenitive', 'group', 'directionCode', 'directionName', 'programName', 'specialty', 'practiceTopic', 'mainStageTasks', 'practiceStart', 'practiceEnd'],
   'title-page.docx': ['studentFio', 'group', 'specialty', 'practiceTopic'],
   'review.docx': ['studentFio', 'group', 'reviewActivities', 'reviewCharacteristic', 'reviewEmployed', 'reviewNextPractice', 'reviewEmploymentOffer', 'reviewSuggestions', 'reviewGrade'],
 };
