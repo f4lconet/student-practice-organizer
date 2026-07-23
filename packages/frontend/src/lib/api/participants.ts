@@ -73,7 +73,10 @@ export async function fetchCohortParticipants(cohortId: string): Promise<CohortP
       userName = String(app?.user?.email ?? "Без имени");
     }
 
-    participants.push({ userId, userName });
+    // Extract role name from application
+    const roleName = app?.role?.name ?? undefined;
+
+    participants.push({ userId, userName, roleName });
   }
 
   return participants;
