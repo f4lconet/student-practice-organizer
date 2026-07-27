@@ -2,19 +2,16 @@
 
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import {
   fetchAdminApplications,
   approveApplication,
   rejectApplication,
+  fetchApplicationTestTask,
   type AdminApplication,
 } from "@/lib/api/applications";
-import {
-  fetchAdminTestTaskSubmissions,
-  type TestTaskSubmissionWithApplication,
-} from "@/lib/api/test-task-submission";
 import { fetchCohortRoles } from "@/lib/api/cohorts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,7 +57,6 @@ import {
   CheckCircle2,
   XCircle,
   MessageSquare,
-  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { ApplicationStatus } from "@/entities/application";
@@ -98,6 +94,13 @@ function getUserName(app: AdminApplication): string {
   return app.user?.email ?? "—";
 }
 
+/** Загрузить тестовое задание для заявки. При ошибке возвращаем { published: false } */
+function fetchTestTaskSafe(applicationId: string) {
+  return fetchApplicationTestTask(applicationId).catch(() => ({
+    published: false as const,
+  }));
+}
+
 // ---- Survey Dialog ----
 function SurveyDialog({
   application,
@@ -108,6 +111,12 @@ function SurveyDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { data: testTask } = useQuery({
+    queryKey: ["application-test-task", application?.id],
+    queryFn: () => fetchTestTaskSafe(application!.id),
+    enabled: open && !!application,
+  });
+
   if (!application) return null;
 
   const sortedFields = [...application.fieldValues].sort(
@@ -146,6 +155,20 @@ function SurveyDialog({
               </div>
             ))
           )}
+
+          {/* Тестовое задание */}
+          <div className="border-t pt-4">
+            <Label className="text-sm text-muted-foreground">Тестовое задание</Label>
+            {testTask && testTask.published && testTask.content ? (
+              <div className="mt-2 rounded-lg bg-muted p-3 whitespace-pre-wrap text-sm">
+                {testTask.content}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {testTask === undefined ? "Загрузка..." : "Тестовое задание ещё не опубликовано"}
+              </p>
+            )}
+          </div>
         </div>
 
         <DialogFooter>
@@ -172,12 +195,21 @@ function ApproveDialog({
 }) {
   const queryClient = useQueryClient();
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+  const [confirmWarning, setConfirmWarning] = useState(false);
 
   const { data: roles } = useQuery({
     queryKey: ["cohort-roles", cohortId],
     queryFn: () => fetchCohortRoles(cohortId),
     enabled: open,
   });
+
+  const { data: testTask } = useQuery({
+    queryKey: ["application-test-task", application?.id],
+    queryFn: () => fetchTestTaskSafe(application!.id),
+    enabled: open && !!application,
+  });
+
+  const testTaskNotPublished = testTask !== undefined && !testTask.published;
 
   const approveMutation = useMutation({
     mutationFn: () => approveApplication(application!.id, selectedRoleId),
@@ -204,6 +236,7 @@ function ApproveDialog({
       toast.success("Заявка одобрена");
       onOpenChange(false);
       setSelectedRoleId("");
+      setConfirmWarning(false);
     },
     onSettled: () => {
       queryClient.invalidateQueries({
@@ -214,6 +247,12 @@ function ApproveDialog({
 
   const handleApprove = () => {
     if (!selectedRoleId) return;
+
+    if (testTaskNotPublished && !confirmWarning) {
+      setConfirmWarning(true);
+      return;
+    }
+
     approveMutation.mutate();
   };
 
@@ -221,7 +260,10 @@ function ApproveDialog({
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (!v) setSelectedRoleId("");
+        if (!v) {
+          setSelectedRoleId("");
+          setConfirmWarning(false);
+        }
         onOpenChange(v);
       }}
     >
@@ -234,6 +276,31 @@ function ApproveDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {testTaskNotPublished && !confirmWarning && (
+            <div className="rounded-lg border border-amber-500 bg-amber-50 p-4 dark:bg-amber-950">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Тестовое задание не опубликовано
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                    Вы ещё не опубликовали тестовое задание. Вы уверены, что хотите одобрить заявку?
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {testTaskNotPublished && confirmWarning && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Вы подтвердили одобрение заявки, несмотря на то, что тестовое задание ещё не опубликовано.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="approve-role">
               Назначить роль <span className="text-destructive">*</span>
@@ -276,7 +343,11 @@ function ApproveDialog({
             onClick={handleApprove}
             disabled={!selectedRoleId || approveMutation.isPending}
           >
-            {approveMutation.isPending ? "Одобрение..." : "Одобрить"}
+            {approveMutation.isPending
+              ? "Одобрение..."
+              : testTaskNotPublished && !confirmWarning
+                ? "Всё равно одобрить"
+                : "Одобрить"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -298,6 +369,15 @@ function RejectDialog({
 }) {
   const queryClient = useQueryClient();
   const [comment, setComment] = useState("");
+  const [confirmWarning, setConfirmWarning] = useState(false);
+
+  const { data: testTask } = useQuery({
+    queryKey: ["application-test-task", application?.id],
+    queryFn: () => fetchTestTaskSafe(application!.id),
+    enabled: open && !!application,
+  });
+
+  const testTaskNotPublished = testTask !== undefined && !testTask.published;
 
   const rejectMutation = useMutation({
     mutationFn: () => rejectApplication(application!.id, comment),
@@ -324,6 +404,7 @@ function RejectDialog({
       toast.success("Заявка отклонена");
       onOpenChange(false);
       setComment("");
+      setConfirmWarning(false);
     },
     onSettled: () => {
       queryClient.invalidateQueries({
@@ -333,6 +414,10 @@ function RejectDialog({
   });
 
   const handleReject = () => {
+    if (testTaskNotPublished && !confirmWarning) {
+      setConfirmWarning(true);
+      return;
+    }
     rejectMutation.mutate();
   };
 
@@ -340,7 +425,10 @@ function RejectDialog({
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (!v) setComment("");
+        if (!v) {
+          setComment("");
+          setConfirmWarning(false);
+        }
         onOpenChange(v);
       }}
     >
@@ -353,6 +441,31 @@ function RejectDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {testTaskNotPublished && !confirmWarning && (
+            <div className="rounded-lg border border-amber-500 bg-amber-50 p-4 dark:bg-amber-950">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Тестовое задание не опубликовано
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                    Вы ещё не опубликовали тестовое задание. Вы уверены, что хотите отклонить заявку?
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {testTaskNotPublished && confirmWarning && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Вы подтвердили отклонение заявки, несмотря на то, что тестовое задание ещё не опубликовано.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="reject-comment">
               Комментарий (будет виден кандидату)
@@ -376,66 +489,11 @@ function RejectDialog({
             onClick={handleReject}
             disabled={rejectMutation.isPending}
           >
-            {rejectMutation.isPending ? "Отклонение..." : "Отклонить"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ---- Test Task Submission Dialog ----
-function TestTaskSubmissionDialog({
-  submissions,
-  open,
-  onOpenChange,
-}: {
-  submissions: TestTaskSubmissionWithApplication[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Решения тестового задания</DialogTitle>
-          <DialogDescription>
-            Решения, отправленные кандидатами
-          </DialogDescription>
-        </DialogHeader>
-
-        {submissions.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">
-            Пока никто не отправил решение
-          </p>
-        ) : (
-          <div className="space-y-4 py-2">
-            {submissions.map((sub) => {
-              const fioField = sub.application.fieldValues.find(
-                (fv) => fv.field.label.toLowerCase() === "фио",
-              );
-              const userName = fioField?.value ?? sub.application.user?.email ?? "—";
-
-              return (
-                <div key={sub.id} className="rounded-lg border p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{userName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(sub.createdAt)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-muted/30 p-3 whitespace-pre-wrap text-sm">
-                    {sub.content}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Закрыть
+            {rejectMutation.isPending
+              ? "Отклонение..."
+              : testTaskNotPublished && !confirmWarning
+                ? "Всё равно отклонить"
+                : "Отклонить"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -459,13 +517,6 @@ export default function AdminApplicationsPage() {
   const [rejectingApp, setRejectingApp] = useState<AdminApplication | null>(
     null,
   );
-  const [viewingSubmissions, setViewingSubmissions] = useState(false);
-
-  const { data: submissionsData } = useQuery({
-    queryKey: ["admin-test-task-submissions", cohortId],
-    queryFn: () => fetchAdminTestTaskSubmissions(cohortId),
-    enabled: viewingSubmissions,
-  });
 
   const {
     data: rawData,
@@ -532,26 +583,13 @@ export default function AdminApplicationsPage() {
     );
   }
 
-  const submissions: TestTaskSubmissionWithApplication[] = Array.isArray(submissionsData)
-    ? submissionsData
-    : [];
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Заявки</h1>
-          <p className="text-muted-foreground">
-            Управление заявками кандидатов когорты
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => setViewingSubmissions(true)}
-        >
-          <ClipboardList className="mr-2 h-4 w-4" />
-          Решения тестового задания
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Заявки</h1>
+        <p className="text-muted-foreground">
+          Управление заявками кандидатов когорты
+        </p>
       </div>
 
       {/* Фильтры */}
@@ -644,33 +682,33 @@ export default function AdminApplicationsPage() {
                     {app.roleId ? (roleNameMap[app.roleId] ?? "Назначена") : "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-2">
                       <Button
-                        variant="ghost"
-                        size="icon-xs"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setViewingApp(app)}
-                        title="Просмотр анкеты"
                       >
-                        <Eye className="h-3.5 w-3.5" />
+                        <Eye className="mr-1.5 h-4 w-4" />
+                        Анкета
                       </Button>
 
                       {app.status === "pending" && (
                         <>
                           <Button
-                            variant="ghost"
-                            size="icon-xs"
+                            variant="default"
+                            size="sm"
                             onClick={() => setApprovingApp(app)}
-                            title="Одобрить"
                           >
-                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                            Одобрить
                           </Button>
                           <Button
-                            variant="ghost"
-                            size="icon-xs"
+                            variant="destructive"
+                            size="sm"
                             onClick={() => setRejectingApp(app)}
-                            title="Отклонить"
                           >
-                            <XCircle className="h-3.5 w-3.5 text-destructive" />
+                            <XCircle className="mr-1.5 h-4 w-4" />
+                            Отклонить
                           </Button>
                         </>
                       )}
@@ -724,13 +762,6 @@ export default function AdminApplicationsPage() {
           if (!open) setRejectingApp(null);
         }}
         cohortId={cohortId}
-      />
-
-      {/* Диалог решений тестового задания */}
-      <TestTaskSubmissionDialog
-        submissions={submissions}
-        open={viewingSubmissions}
-        onOpenChange={setViewingSubmissions}
       />
     </div>
   );

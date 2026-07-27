@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -34,9 +34,11 @@ import { Loader2, MailCheck } from "lucide-react";
 
 type PageState = "form" | "success";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { register: registerUser } = useAuth();
+  const redirectTo = searchParams.get("redirect") || "";
   const [pageState, setPageState] = useState<PageState>("form");
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [isPending, setIsPending] = useState(false);
@@ -301,15 +303,23 @@ export default function RegisterPage() {
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Уже есть аккаунт?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-primary underline-offset-4 hover:underline"
-            >
-              Войти
-            </Link>
+              <Link
+                href={`/login${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Войти
+              </Link>
           </p>
         </CardContent>
       </Card>
-    </main>
+</main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   );
 }

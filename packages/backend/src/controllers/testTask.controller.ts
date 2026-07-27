@@ -3,6 +3,16 @@ import { testTaskService } from '../services/testTask.service.js';
 import { AuthRequest } from '../middleware/auth.middleware.js';
 
 export const testTaskController = {
+  async getByCohort(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const cohortId = Array.isArray(req.params.cohortId) ? req.params.cohortId[0] : req.params.cohortId;
+      const testTask = await testTaskService.getByCohort(cohortId);
+      res.json(testTask);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async upsert(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const cohortId = Array.isArray(req.params.cohortId) ? req.params.cohortId[0] : req.params.cohortId;
@@ -29,7 +39,8 @@ export const testTaskController = {
       const { id } = req.params;
       const applicationId = Array.isArray(id) ? id[0] : id;
       const userId = req.user!.id;
-      const result = await testTaskService.getForApplication(applicationId, userId);
+      const userRole = req.user!.role;
+      const result = await testTaskService.getForApplication(applicationId, userId, userRole);
       res.json(result);
     } catch (error) {
       next(error);

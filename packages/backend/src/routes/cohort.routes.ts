@@ -328,6 +328,26 @@ router.delete('/roles/:id', cohortContextMiddleware, cohortRoleController.delete
 /**
  * @swagger
  * /admin/cohorts/{cohortId}/test-task:
+ *   get:
+ *     summary: Получить тестовое задание когорты
+ *     tags: [Admin / Test Task]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: cohortId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Тестовое задание (или null)
+ */
+router.get('/:cohortId/test-task', cohortContextMiddleware, testTaskController.getByCohort);
+
+/**
+ * @swagger
+ * /admin/cohorts/{cohortId}/test-task:
  *   post:
  *     summary: Создать или обновить тестовое задание для когорты
  *     tags: [Admin / Test Task]

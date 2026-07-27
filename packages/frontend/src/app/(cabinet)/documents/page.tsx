@@ -31,6 +31,7 @@ import {
   CheckCheck,
   XCircle,
   MessageSquareWarning,
+  Clock,
 } from "lucide-react";
 
 // =====================================================
@@ -206,6 +207,7 @@ export default function CabinetDocumentsPage() {
     queryFn: () => fetchDashboard(),
   });
   const application = dashboard?.applications?.[0];
+  const applicationApproved = application?.status === "approved";
   const applicationId = application?.id ?? "";
   const cohortId = application?.cohortId ?? "";
 
@@ -385,7 +387,6 @@ export default function CabinetDocumentsPage() {
     );
   }
 
-  const applicationApproved = application?.status === "approved";
   const reportFileName = docData?.reportFileUrl ?? null;
   const reportStatus = docData?.reportStatus ?? "";
   const reportComment = docData?.reportComment ?? null;
@@ -401,8 +402,22 @@ export default function CabinetDocumentsPage() {
       </div>
 
       {/* ======== Единая форма данных студента ======== */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+      <Card className="relative overflow-hidden">
+        {!applicationApproved && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="mx-auto max-w-md text-center px-4">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Clock className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold">Заявка ещё не одобрена</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Функционал документов станет доступен после того, как администратор
+                одобрит вашу заявку на практику.
+              </p>
+            </div>
+          </div>
+        )}
+        <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-4 ${!applicationApproved ? "opacity-30 pointer-events-none" : ""}`}>
           <div>
             <CardTitle className="text-base">Данные студента</CardTitle>
             <CardDescription>
@@ -410,7 +425,6 @@ export default function CabinetDocumentsPage() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            {/* Индикатор сохранения */}
             {saveStatus === "saving" && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -440,7 +454,7 @@ export default function CabinetDocumentsPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className={!applicationApproved ? "opacity-30 pointer-events-none" : ""}>
           <div className="grid gap-4 sm:grid-cols-2">
             {FORM_FIELDS.map((field) => (
               <div
@@ -476,7 +490,7 @@ export default function CabinetDocumentsPage() {
       </Card>
 
       {/* ======== Секция загрузки отчёта ======== */}
-      <Card>
+      <Card className={!applicationApproved ? "opacity-30 pointer-events-none" : ""}>
         <CardHeader>
           <CardTitle className="text-base">Отчёт о практике</CardTitle>
           <CardDescription>
@@ -496,8 +510,7 @@ export default function CabinetDocumentsPage() {
       </Card>
 
       {/* ======== Карточки документов ======== */}
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* ИЗ — Индивидуальное задание */}
+      <div className={`grid gap-6 md:grid-cols-3 ${!applicationApproved ? "opacity-30 pointer-events-none" : ""}`}>
         <DocumentCard
           title="Индивидуальное задание"
           description="Формируется на основе данных студента и одобренной заявки"
@@ -513,7 +526,6 @@ export default function CabinetDocumentsPage() {
           onGenerate={() => handleGenerate("individual-task")}
         />
 
-        {/* Отзыв */}
         <DocumentCard
           title="Отзыв о практике"
           description="Готовится администратором после проверки"
@@ -525,7 +537,6 @@ export default function CabinetDocumentsPage() {
           onGenerate={() => handleGenerate("review")}
         />
 
-        {/* Титульный лист */}
         <DocumentCard
           title="Титульный лист отчёта"
           description="Доступен после загрузки отчёта и одобрения администратором"

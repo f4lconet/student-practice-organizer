@@ -77,7 +77,7 @@ export default function AdminLayout({
               <ArrowLeft className="h-4 w-4" />
             </Button>
 
-            <Link href="/cohorts" className="text-lg font-semibold tracking-tight">
+            <Link href="/" className="text-lg font-semibold tracking-tight">
               Практика · Админ
             </Link>
 

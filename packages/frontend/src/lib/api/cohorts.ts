@@ -87,6 +87,10 @@ export function deleteCohortRole(roleId: string): Promise<void> {
 
 // ---- Test Task (admin) ----
 
+export function fetchTestTask(cohortId: string): Promise<{ id: string; content: string; publishedAt: string | null } | null> {
+  return apiClient.get(`/admin/cohorts/${cohortId}/test-task`);
+}
+
 export function saveTestTask(cohortId: string, content: string): Promise<void> {
   return apiClient.post(`/admin/cohorts/${cohortId}/test-task`, { content });
 }

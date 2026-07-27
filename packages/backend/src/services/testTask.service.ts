@@ -4,6 +4,10 @@ import { mailService } from '../lib/mail.service.js';
 import { NotFoundError, ForbiddenError } from '../errors/index.js';
 
 export const testTaskService = {
+  async getByCohort(cohortId: string) {
+    return testTaskRepository.findByCohort(cohortId);
+  },
+
   async upsert(cohortId: string, content: string) {
     return testTaskRepository.upsert(cohortId, content);
   },
@@ -24,10 +28,12 @@ export const testTaskService = {
     return testTask;
   },
 
-  async getForApplication(applicationId: string, userId: string) {
+  async getForApplication(applicationId: string, userId: string, userRole?: string) {
     const application = await applicationRepository.findById(applicationId);
     if (!application) throw new NotFoundError('Application not found');
-    if (application.userId !== userId) throw new ForbiddenError('Access denied');
+    if (application.userId !== userId && userRole !== 'ADMIN') {
+      throw new ForbiddenError('Access denied');
+    }
 
     const testTask = await testTaskRepository.findByCohort(application.cohortId);
     if (!testTask || !testTask.publishedAt) {

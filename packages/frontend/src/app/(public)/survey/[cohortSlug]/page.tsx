@@ -233,35 +233,61 @@ export default function SurveyPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!isAuthenticated && (
-            <Alert className="mb-6">
-              <AlertDescription>
-                Вы можете заполнить анкету сейчас. После отправки система предложит
-                зарегистрироваться, чтобы вы могли отслеживать статус заявки в личном кабинете.
-              </AlertDescription>
-            </Alert>
-          )}
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleSubmit)}
-              className="space-y-6"
-              noValidate
-            >
-              {fields
-                .sort((a, b) => a.order - b.order)
-                .map((field) => (
-                  <SurveyFieldInput key={field.id} field={field} form={form} />
-                ))}
+          {!isAuthenticated ? (
+            <div className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Требуется авторизация</AlertTitle>
+                <AlertDescription>
+                  Для подачи заявки на практику необходимо войти в систему или
+                  зарегистрироваться.
+                </AlertDescription>
+              </Alert>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  render={
+                    <a href={`/login?redirect=${encodeURIComponent(`/survey/${slug}`)}`} />
+                  }
+                  nativeButton={false}
+                >
+                  Войти
+                </Button>
+                <Button
+                  variant="outline"
+                  render={
+                    <a href={`/register?redirect=${encodeURIComponent(`/survey/${slug}`)}`} />
+                  }
+                  nativeButton={false}
+                >
+                  Зарегистрироваться
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(handleSubmit)}
+                  className="space-y-6"
+                  noValidate
+                >
+                  {fields
+                    .sort((a, b) => a.order - b.order)
+                    .map((field) => (
+                      <SurveyFieldInput key={field.id} field={field} form={form} />
+                    ))}
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Отправка..." : "Отправить анкету"}
-              </Button>
-            </form>
-          </Form>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Отправка..." : "Отправить анкету"}
+                  </Button>
+                </form>
+              </Form>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

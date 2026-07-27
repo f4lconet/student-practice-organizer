@@ -30,7 +30,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Users } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { AlertCircle, Users, Clock } from "lucide-react";
 import type { TaskCard } from "@/entities";
 
 export default function CabinetTasksPage() {
@@ -64,7 +65,9 @@ export default function CabinetTasksPage() {
     queryFn: () => fetchDashboard(),
   });
 
-  const cohortId = dashboard?.applications?.[0]?.cohortId ?? "";
+  const application = dashboard?.applications?.[0];
+  const applicationApproved = application?.status === "approved";
+  const cohortId = application?.cohortId ?? "";
 
   // Загружаем данные когорты
   const { data: cohort } = useQuery({
@@ -89,14 +92,14 @@ export default function CabinetTasksPage() {
   const tasksQuery = useQuery({
     queryKey: ["tasks", cohortId, weekStartStr, showAll],
     queryFn: () => fetchTasks({ cohortId, weekStart: weekStartStr, all: showAll }),
-    enabled: !!cohortId,
+    enabled: !!cohortId && applicationApproved,
   });
 
   // Загрузка участников (нужны для отображения ФИО)
   const { data: participants = [] } = useQuery({
     queryKey: ["cohort-participants", cohortId],
     queryFn: () => fetchCohortParticipants(cohortId),
-    enabled: !!cohortId && showAll,
+    enabled: !!cohortId && showAll && applicationApproved,
   });
 
   // Создаём участника для текущего пользователя, если его нет в списке
@@ -295,21 +298,58 @@ export default function CabinetTasksPage() {
         </Alert>
       )}
 
-      <MultiParticipantGrid
-        currentWeekStart={currentWeekStart}
-        practiceStart={practiceStart}
-        practiceEnd={practiceEnd}
-        tasks={tasks}
-        participants={allParticipants}
-        currentUserId={userId}
-        showAll={showAll}
-        canEdit={true}
-        onPrevWeek={handlePrevWeek}
-        onNextWeek={handleNextWeek}
-        onCellClick={handleCellClick}
-        onEditTask={handleEditTask}
-        onDeleteTask={handleDeleteTask}
-      />
+      {!applicationApproved ? (
+        <Card className="relative overflow-hidden">
+          {/* Overlay */}
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="mx-auto max-w-md text-center px-4">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Clock className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold">Заявка ещё не одобрена</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Функционал задач станет доступен после того, как администратор
+                одобрит вашу заявку на практику.
+              </p>
+            </div>
+          </div>
+
+          {/* Заблокированный контент */}
+          <CardContent className="p-6 opacity-30 pointer-events-none">
+            <MultiParticipantGrid
+              currentWeekStart={currentWeekStart}
+              practiceStart={practiceStart}
+              practiceEnd={practiceEnd}
+              tasks={[]}
+              participants={allParticipants}
+              currentUserId={userId}
+              showAll={showAll}
+              canEdit={false}
+              onPrevWeek={handlePrevWeek}
+              onNextWeek={handleNextWeek}
+              onCellClick={() => {}}
+              onEditTask={() => {}}
+              onDeleteTask={() => {}}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <MultiParticipantGrid
+          currentWeekStart={currentWeekStart}
+          practiceStart={practiceStart}
+          practiceEnd={practiceEnd}
+          tasks={tasks}
+          participants={allParticipants}
+          currentUserId={userId}
+          showAll={showAll}
+          canEdit={true}
+          onPrevWeek={handlePrevWeek}
+          onNextWeek={handleNextWeek}
+          onCellClick={handleCellClick}
+          onEditTask={handleEditTask}
+          onDeleteTask={handleDeleteTask}
+        />
+      )}
 
       <TaskCardDialog
         open={dialogOpen}

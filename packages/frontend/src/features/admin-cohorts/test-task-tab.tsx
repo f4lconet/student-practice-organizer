@@ -1,8 +1,8 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { saveTestTask, publishTestTask } from "@/lib/api/cohorts";
+import { fetchTestTask, saveTestTask, publishTestTask } from "@/lib/api/cohorts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -24,24 +24,31 @@ interface TestTaskTabProps {
 
 export function TestTaskTab({ cohortId }: TestTaskTabProps) {
   const queryClient = useQueryClient();
-  const [content, setContent] = useState("");
-  const [isPublished, setIsPublished] = useState(false);
-  const [isContentDirty, setIsContentDirty] = useState(false);
+  const [localContent, setLocalContent] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+
+  const { data, isLoading: isFetching } = useQuery({
+    queryKey: ["test-task", cohortId],
+    queryFn: () => fetchTestTask(cohortId),
+    refetchOnMount: "always",
+    staleTime: 0,
+  });
+
+  // Если localContent === null — используем данные с сервера
+  const content = localContent !== null ? localContent : (data?.content ?? "");
+  const isPublished = data?.publishedAt !== null && data !== null;
 
   const saveMutation = useMutation({
     mutationFn: (newContent: string) =>
       saveTestTask(cohortId, newContent),
     onSuccess: () => {
-      setIsContentDirty(false);
       setSaveError(null);
-      setIsLoading(false);
+      setLocalContent(null);
+      queryClient.invalidateQueries({ queryKey: ["test-task", cohortId] });
       toast.success("Тестовое задание успешно сохранено");
     },
-    onError: () => {
-      setSaveError("Ошибка при сохранении содержимого");
-      setIsLoading(false);
+    onError: (err: Error) => {
+      setSaveError(err.message || "Ошибка при сохранении");
       toast.error("Ошибка при сохранении тестового задания");
     },
   });
@@ -49,24 +56,24 @@ export function TestTaskTab({ cohortId }: TestTaskTabProps) {
   const publishMutation = useMutation({
     mutationFn: () => publishTestTask(cohortId),
     onSuccess: () => {
-      setIsPublished(true);
+      setLocalContent(null);
       queryClient.invalidateQueries({ queryKey: ["test-task", cohortId] });
       toast.success("Тестовое задание успешно опубликовано");
     },
-    onError: () => {
-      setSaveError("Ошибка при публикации тестового задания");
+    onError: (err: Error) => {
+      setSaveError(err.message || "Ошибка при публикации");
       toast.error("Ошибка при публикации тестового задания");
     },
   });
 
   const handleSave = () => {
-    if (content.trim().length === 0) return;
+    if (!content.trim()) return;
     setSaveError(null);
-    setIsLoading(true);
     saveMutation.mutate(content);
   };
 
   const handlePublish = () => {
+    if (!content.trim()) return;
     setSaveError(null);
     publishMutation.mutate();
   };
@@ -96,7 +103,7 @@ export function TestTaskTab({ cohortId }: TestTaskTabProps) {
         </div>
       </div>
 
-      {isLoading && (
+      {isFetching && (
         <p className="text-xs text-muted-foreground">Загрузка...</p>
       )}
 
@@ -113,10 +120,7 @@ export function TestTaskTab({ cohortId }: TestTaskTabProps) {
             <Textarea
               id="test-task-content"
               value={content}
-              onChange={(e) => {
-                setContent(e.target.value);
-                setIsContentDirty(true);
-              }}
+              onChange={(e) => setLocalContent(e.target.value)}
               placeholder="## Тестовое задание
 
 Реализуйте ..."
@@ -128,32 +132,25 @@ export function TestTaskTab({ cohortId }: TestTaskTabProps) {
           <div className="flex items-center gap-2">
             <Button
               onClick={handleSave}
-              disabled={saveMutation.isPending || !isContentDirty}
+              disabled={saveMutation.isPending}
             >
               <Save className="mr-2 h-4 w-4" />
               {saveMutation.isPending ? "Сохранение..." : "Сохранить"}
             </Button>
 
-            {!isPublished && (
-              <Button
-                variant="default"
-                onClick={handlePublish}
-                disabled={publishMutation.isPending || !content}
-              >
-                <Send className="mr-2 h-4 w-4" />
-                {publishMutation.isPending
-                  ? "Публикация..."
+            <Button
+              variant={isPublished ? "secondary" : "default"}
+              onClick={handlePublish}
+              disabled={publishMutation.isPending}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {publishMutation.isPending
+                ? "Публикация..."
+                : isPublished
+                  ? "Переопубликовать"
                   : "Опубликовать"}
-              </Button>
-            )}
+            </Button>
           </div>
-
-          {isContentDirty && !saveMutation.isPending && (
-            <p className="text-xs text-amber-600">
-              Есть несохранённые изменения. Нажмите «Сохранить» перед
-              публикацией.
-            </p>
-          )}
         </CardContent>
       </Card>
 

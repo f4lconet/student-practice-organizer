@@ -9,7 +9,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 import { useAuth } from "@/providers/auth-provider";
-import { useTheme } from "@/providers/theme-provider";
 import { changePassword } from "@/lib/api/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -24,8 +23,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, LogOut, KeyRound, Moon, Sun } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ArrowLeft, LogOut, KeyRound } from "lucide-react";
 
 const passwordSchema = z.object({
   currentPassword: z.string().min(1, "Введите текущий пароль"),
@@ -41,7 +42,6 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 export default function ProfilePage() {
   const router = useRouter();
   const { user, isLoading, logout } = useAuth();
-  const { theme, setTheme, resolvedTheme } = useTheme();
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
   const form = useForm<PasswordFormData>({
@@ -76,10 +76,6 @@ export default function ProfilePage() {
     },
     [changePasswordMutation],
   );
-
-  const toggleTheme = useCallback(() => {
-    setTheme(resolvedTheme === "dark" ? "light" : "dark");
-  }, [resolvedTheme, setTheme]);
 
   if (isLoading || !user) {
     return (
@@ -141,46 +137,38 @@ export default function ProfilePage() {
                 : "—"}
             </p>
           </div>
+
+          <Separator className="my-2" />
+
+          {/* Смена пароля */}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setPasswordDialogOpen(true)}
+          >
+            <KeyRound className="mr-2 h-4 w-4" />
+            Сменить пароль
+          </Button>
+
+          {/* Переключение темы */}
+          <div className="flex items-center justify-between w-full px-4 py-2 border rounded-lg">
+            <span className="text-sm font-medium">Тема</span>
+            <ThemeToggle />
+          </div>
+
+          {/* Выход */}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              logout();
+            }}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Выйти
+          </Button>
         </CardContent>
       </Card>
-
-      <div className="mt-6 flex flex-col gap-3">
-        {/* Кнопка смены пароля */}
-        <Button
-          variant="outline"
-          className="w-full max-w-lg"
-          onClick={() => setPasswordDialogOpen(true)}
-        >
-          <KeyRound className="mr-2 h-4 w-4" />
-          Сменить пароль
-        </Button>
-
-        {/* Кнопка переключения темы */}
-        <Button
-          variant="outline"
-          className="w-full max-w-lg"
-          onClick={toggleTheme}
-        >
-          {resolvedTheme === "dark" ? (
-            <Sun className="mr-2 h-4 w-4" />
-          ) : (
-            <Moon className="mr-2 h-4 w-4" />
-          )}
-          {resolvedTheme === "dark" ? "Светлая тема" : "Тёмная тема"}
-        </Button>
-
-        {/* Кнопка выхода */}
-        <Button
-          variant="outline"
-          className="w-full max-w-lg"
-          onClick={() => {
-            logout();
-          }}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Выйти
-        </Button>
-      </div>
 
       {/* Диалог смены пароля */}
       <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>

@@ -40,6 +40,24 @@ export interface AdminApplication {
 /** Заявка с ответами на поля анкеты — то, что приходит с бэкенда в /api/applications/my */
 export interface ApplicationWithFieldValues extends Application {
   fieldValues: AdminApplication["fieldValues"];
+  testTaskSubmission: {
+    id: string;
+    testTaskId: string;
+    applicationId: string;
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  cohort: {
+    id: string;
+    name: string;
+    testTask: {
+      id: string;
+      cohortId: string;
+      content: string;
+      publishedAt: string | null;
+    } | null;
+  };
 }
 
 /**

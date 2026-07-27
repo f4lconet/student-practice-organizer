@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,10 +30,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [isPending, setIsPending] = useState(false);
+
+  const redirectTo = searchParams.get("redirect") || "";
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -52,8 +55,10 @@ export default function LoginPage() {
 
       toast.success("Вы успешно вошли в систему");
 
-      // Редирект по роли
-      if (user.role === "ADMIN") {
+      // Редирект: приоритет у redirect-параметра, иначе по роли
+      if (redirectTo) {
+        router.push(redirectTo);
+      } else if (user.role === "ADMIN") {
         router.push("/cohorts");
       } else {
         router.push("/applications");
@@ -146,7 +151,7 @@ export default function LoginPage() {
             <p>
               Нет аккаунта?{" "}
               <Link
-                href="/register"
+                href={`/register${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`}
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
                 Зарегистрироваться
@@ -163,6 +168,14 @@ export default function LoginPage() {
           </div>
         </CardContent>
       </Card>
-    </main>
+</main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
