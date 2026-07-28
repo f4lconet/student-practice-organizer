@@ -25,6 +25,14 @@ export function deleteCohort(id: string): Promise<void> {
   return apiClient.delete<void>(`/admin/cohorts/${id}`);
 }
 
+export function archiveCohort(id: string): Promise<Cohort> {
+  return apiClient.patch<Cohort>(`/admin/cohorts/${id}/archive`);
+}
+
+export function unarchiveCohort(id: string): Promise<Cohort> {
+  return apiClient.patch<Cohort>(`/admin/cohorts/${id}/unarchive`);
+}
+
 /** PUBLIC: Получить активную когорту */
 export function fetchActiveCohort(): Promise<Cohort> {
   return apiClient.get<Cohort>("/public/cohorts/active", { skipAuth: true });

@@ -44,6 +44,7 @@ describe('DashboardService', () => {
         applicationEnd: new Date('2026-12-31'),
         practiceStart: new Date('2026-06-01'),
         practiceEnd: new Date('2026-08-31'),
+        isArchived: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -62,6 +63,7 @@ describe('DashboardService', () => {
         applicationEnd: new Date('2026-12-31'),
         practiceStart: new Date('2026-06-01'),
         practiceEnd: new Date('2026-08-31'),
+        isArchived: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

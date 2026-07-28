@@ -1,10 +1,6 @@
 /node_modules
 /.turbo
 packages/frontend/src/lib/api/participants.ts
-packages/backend/scripts/test-login.mjs
-packages/backend/scripts/update-admin-password.mjs
-packages/backend/scripts/api-login-test.mjs
 .next/trace-build
 .next/trace
-packages/backend/scripts/create-admin.ts
-
+packages/backend/scripts/

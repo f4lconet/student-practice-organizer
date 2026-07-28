@@ -6,6 +6,8 @@ export interface Cohort {
   applicationEnd: string;
   practiceStart: string;
   practiceEnd: string;
+  /** Флаг архивации */
+  isArchived: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -24,10 +24,6 @@ export const cohortService = {
       throw new ValidationError('The internship end date must be later than the start date.');
     }
 
-    if (applicationEnd > practiceStart) {
-      throw new ValidationError('The application deadline must be prior to the start of the internship.');
-    }
-
     const existingCohort = await cohortRepository.findByName(data.name);
     if (existingCohort) {
       throw new ConflictError(`A cohort named "${data.name}" already exists.`);
@@ -99,10 +95,6 @@ export const cohortService = {
       throw new ValidationError('The internship end date must be later than the start date.');
     }
 
-    if (appEnd > pracStart) {
-      throw new ValidationError('The application deadline must be prior to the start of the internship.');
-    }
-
     if (data.name && data.name !== existingCohort.name) {
       const nameExists = await cohortRepository.findByName(data.name);
       if (nameExists) {
@@ -114,6 +106,10 @@ export const cohortService = {
   },
 
   async findActive() {
+    return cohortRepository.findActive();
+  },
+
+  async findCurrentlyActive() {
     const activeCohort = await cohortRepository.findActive();
     if (!activeCohort) {
       throw new NotFoundError('Active cohort not found');
@@ -131,5 +127,27 @@ export const cohortService = {
       throw new NotFoundError('Cohort not found');
     }
     return cohortRepository.delete(id);
+  },
+
+  async archive(id: string) {
+    const cohort = await cohortRepository.findById(id);
+    if (!cohort) {
+      throw new NotFoundError('Cohort not found');
+    }
+    if (cohort.isArchived) {
+      throw new ValidationError('Cohort is already archived');
+    }
+    return cohortRepository.archive(id);
+  },
+
+  async unarchive(id: string) {
+    const cohort = await cohortRepository.findById(id);
+    if (!cohort) {
+      throw new NotFoundError('Cohort not found');
+    }
+    if (!cohort.isArchived) {
+      throw new ValidationError('Cohort is not archived');
+    }
+    return cohortRepository.unarchive(id);
   },
 };

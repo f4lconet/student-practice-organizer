@@ -62,9 +62,31 @@ export const cohortController = {
     }
   },
 
+  async archive(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const cohortId = Array.isArray(id) ? id[0] : id;
+      const cohort = await cohortService.archive(cohortId);
+      res.json(cohort);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async unarchive(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const cohortId = Array.isArray(id) ? id[0] : id;
+      const cohort = await cohortService.unarchive(cohortId);
+      res.json(cohort);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async findActive(req: Request, res: Response, next: NextFunction) {
     try {
-      const cohort = await cohortService.findActive();
+      const cohort = await cohortService.findCurrentlyActive();
       res.json(cohort);
     } catch (error) {
       next(error);

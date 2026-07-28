@@ -9,6 +9,7 @@ const mockCohort = {
   applicationEnd: new Date('2026-03-01'),
   practiceStart: new Date('2026-06-01'),
   practiceEnd: new Date('2026-08-31'),
+  isArchived: false,
   createdAt: new Date(),
   updatedAt: new Date(),
   roles: [],
@@ -56,16 +57,6 @@ describe('CohortService', () => {
         practiceStart: '2026-08-31',
         practiceEnd: '2026-06-01',
       })).rejects.toThrow('The internship end date must be later than the start date');
-    });
-
-    it('should throw ValidationError when applicationEnd > practiceStart', async () => {
-      await expect(cohortService.create({
-        name: '2026',
-        applicationStart: '2026-01-01',
-        applicationEnd: '2026-06-15',
-        practiceStart: '2026-06-01',
-        practiceEnd: '2026-08-31',
-      })).rejects.toThrow('The application deadline must be prior to the start of the internship');
     });
 
     it('should throw ConflictError for duplicate name', async () => {
@@ -143,12 +134,14 @@ describe('CohortService', () => {
     it('should return active cohort', async () => {
       vi.mocked(prisma.cohort.findFirst).mockResolvedValueOnce(mockCohort);
       const result = await cohortService.findActive();
-      expect(result.name).toBe('2026');
+      expect(result).not.toBeNull();
+      expect(result!.name).toBe('2026');
     });
 
-    it('should throw NotFoundError when no active cohort', async () => {
+    it('should return null when no active cohort', async () => {
       vi.mocked(prisma.cohort.findFirst).mockResolvedValueOnce(null);
-      await expect(cohortService.findActive()).rejects.toThrow('Active cohort not found');
+      const result = await cohortService.findActive();
+      expect(result).toBeNull();
     });
   });
 });

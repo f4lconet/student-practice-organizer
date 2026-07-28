@@ -218,6 +218,63 @@ router.delete('/:id', cohortController.delete);
 
 /**
  * @swagger
+ * /admin/cohorts/{id}/archive:
+ *   patch:
+ *     summary: Архивировать когорту
+ *     description: Архивированная когорта скрывается из активных списков, с ней нельзя работать.
+ *     tags: [Cohorts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Когорта архивирована
+ *       400:
+ *         description: Когорта уже архивирована
+ *       404:
+ *         description: Когорта не найдена
+ *       401:
+ *         description: Не авторизован
+ *       403:
+ *         description: Требуется роль администратора
+ */
+router.patch('/:id/archive', cohortController.archive);
+
+/**
+ * @swagger
+ * /admin/cohorts/{id}/unarchive:
+ *   patch:
+ *     summary: Разархивировать когорту
+ *     description: Восстанавливает когорту из архива.
+ *     tags: [Cohorts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Когорта разархивирована
+ *       400:
+ *         description: Когорта не архивирована
+ *       404:
+ *         description: Когорта не найдена
+ *       401:
+ *         description: Не авторизован
+ *       403:
+ *         description: Требуется роль администратора
+ */
+router.patch('/:id/unarchive', cohortController.unarchive);
+/**
+ * @swagger
  * /admin/cohorts/{cohortId}/roles:
  *   post:
  *     summary: Добавить роль/трек в когорту

@@ -10,6 +10,8 @@ import {
   fetchCohorts,
   createCohort,
   updateCohort,
+  archiveCohort,
+  unarchiveCohort,
 } from "@/lib/api/cohorts";
 import { useAdminCohortStore } from "@/lib/stores/admin-cohort-store";
 import { Button } from "@/components/ui/button";
@@ -32,9 +34,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
+import {
+  Badge,
+} from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Plus, AlertCircle } from "lucide-react";
+import { CalendarIcon, Plus, AlertCircle, Archive, ArchiveRestore, ArchiveX } from "lucide-react";
 import { z } from "zod";
 import type { Cohort } from "@/entities/cohort";
 
@@ -89,12 +100,8 @@ function CohortFormDialog({
   onOpenChange: (open: boolean) => void;
   cohort?: Cohort;
 }) {
-  const queryClient = useQueryClient();
-  const router = useRouter();
   const isEditing = !!cohort;
 
-  // Используем cohort.id как key для принудительного пересоздания компонента
-  // при смене редактируемой когорты, что гарантирует актуальные данные в форме
   return (
     <Dialog key={cohort?.id ?? "new"} open={open} onOpenChange={onOpenChange}>
       <CohortFormContent
@@ -116,7 +123,6 @@ function CohortFormContent({
   isEditing: boolean;
 }) {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const [formData, setFormData] = useState<CohortFormData>(
     initFormData(cohort),
   );
@@ -153,7 +159,7 @@ function CohortFormContent({
       if (isEditing && cohort) {
         await updateCohort(cohort.id, payload);
       } else {
-        await createCohort(payload);
+        await createCohort({ ...payload, isArchived: false });
       }
 
       queryClient.invalidateQueries({ queryKey: ["cohorts"] });
@@ -317,15 +323,95 @@ function formatDate(dateStr: string): string {
   }
 }
 
+function CohortCard({
+  cohort,
+  onSelect,
+  onEdit,
+  onArchive,
+  onUnarchive,
+}: {
+  cohort: Cohort;
+  onSelect: (cohort: Cohort) => void;
+  onEdit: (e: React.MouseEvent, cohort: Cohort) => void;
+  onArchive: (e: React.MouseEvent, cohort: Cohort) => void;
+  onUnarchive: (e: React.MouseEvent, cohort: Cohort) => void;
+}) {
+  return (
+    <Card
+      className="cursor-pointer transition-colors hover:bg-accent/50"
+      onClick={() => onSelect(cohort)}
+    >
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-xl">{cohort.name}</CardTitle>
+          {cohort.isArchived && (
+            <Badge variant="secondary" className="shrink-0">
+              <Archive className="mr-1 h-3 w-3" />
+              В архиве
+            </Badge>
+          )}
+        </div>
+        <CardDescription>
+          Приём заявок: {formatDate(cohort.applicationStart)} —{" "}
+          {formatDate(cohort.applicationEnd)}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <CalendarIcon className="h-4 w-4" />
+          <span>
+            Практика: {formatDate(cohort.practiceStart)} —{" "}
+            {formatDate(cohort.practiceEnd)}
+          </span>
+        </div>
+      </CardContent>
+      <CardFooter className="border-t pt-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => onEdit(e, cohort)}
+        >
+          Редактировать
+        </Button>
+
+        {cohort.isArchived ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-muted-foreground hover:text-foreground"
+            onClick={(e) => onUnarchive(e, cohort)}
+          >
+            <ArchiveRestore className="mr-1 h-4 w-4" />
+            Восстановить
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-muted-foreground hover:text-destructive"
+            onClick={(e) => onArchive(e, cohort)}
+          >
+            <ArchiveX className="mr-1 h-4 w-4" />
+            В архив
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
+
 export default function CohortsPage() {
   const router = useRouter();
   const setSelectedCohortId = useAdminCohortStore(
     (s) => s.setSelectedCohortId,
   );
+  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCohort, setEditingCohort] = useState<Cohort | undefined>(
     undefined,
   );
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmUnarchive, setConfirmUnarchive] = useState(false);
 
   const {
     data: cohorts,
@@ -336,7 +422,25 @@ export default function CohortsPage() {
     queryFn: fetchCohorts,
   });
 
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => archiveCohort(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cohorts"] });
+    },
+  });
+
+  const unarchiveMutation = useMutation({
+    mutationFn: (id: string) => unarchiveCohort(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cohorts"] });
+    },
+  });
+
+  const activeCohorts = cohorts?.filter((c) => !c.isArchived) ?? [];
+  const archivedCohorts = cohorts?.filter((c) => c.isArchived) ?? [];
+
   const handleSelectCohort = (cohort: Cohort) => {
+    if (cohort.isArchived) return;
     setSelectedCohortId(cohort.id);
     router.push(`/${cohort.id}/applications`);
   };
@@ -350,6 +454,28 @@ export default function CohortsPage() {
     e.stopPropagation();
     setEditingCohort(cohort);
     setDialogOpen(true);
+  };
+
+  const handleArchiveClick = (e: React.MouseEvent, cohort: Cohort) => {
+    e.stopPropagation();
+    setConfirmId(cohort.id);
+    setConfirmUnarchive(false);
+  };
+
+  const handleUnarchiveClick = (e: React.MouseEvent, cohort: Cohort) => {
+    e.stopPropagation();
+    setConfirmId(cohort.id);
+    setConfirmUnarchive(true);
+  };
+
+  const handleConfirm = () => {
+    if (!confirmId) return;
+    if (confirmUnarchive) {
+      unarchiveMutation.mutate(confirmId);
+    } else {
+      archiveMutation.mutate(confirmId);
+    }
+    setConfirmId(null);
   };
 
   if (isLoading) {
@@ -407,41 +533,112 @@ export default function CohortsPage() {
           </CardFooter>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {cohorts.map((cohort) => (
-            <Card
-              key={cohort.id}
-              className="cursor-pointer transition-colors hover:bg-accent/50"
-              onClick={() => handleSelectCohort(cohort)}
-            >
-              <CardHeader>
-                <CardTitle className="text-xl">{cohort.name}</CardTitle>
-                  <CardDescription>
-                    Приём заявок: {formatDate(cohort.applicationStart)} —{" "}
-                    {formatDate(cohort.applicationEnd)}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CalendarIcon className="h-4 w-4" />
-                  <span>
-                    Практика: {formatDate(cohort.practiceStart)} —{" "}
-                    {formatDate(cohort.practiceEnd)}
-                  </span>
+        <>
+          <Tabs defaultValue="active">
+            <TabsList>
+              <TabsTrigger value="active">
+                Активные
+                {activeCohorts.length > 0 && (
+                  <Badge variant="default" className="ml-1.5 h-5 px-1.5 text-xs">
+                    {activeCohorts.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="archived">
+                Архив
+                {archivedCohorts.length > 0 && (
+                  <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-xs">
+                    {archivedCohorts.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="active" className="mt-6">
+              {activeCohorts.length === 0 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Нет активных когорт</CardTitle>
+                    <CardDescription>
+                      Все когорты находятся в архиве
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {activeCohorts.map((cohort) => (
+                    <CohortCard
+                      key={cohort.id}
+                      cohort={cohort}
+                      onSelect={handleSelectCohort}
+                      onEdit={handleEditCohort}
+                      onArchive={handleArchiveClick}
+                      onUnarchive={handleUnarchiveClick}
+                    />
+                  ))}
                 </div>
-              </CardContent>
-              <CardFooter className="border-t pt-4">
+              )}
+            </TabsContent>
+
+            <TabsContent value="archived" className="mt-6">
+              {archivedCohorts.length === 0 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Архив пуст</CardTitle>
+                    <CardDescription>
+                      Нет архивированных когорт
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {archivedCohorts.map((cohort) => (
+                    <CohortCard
+                      key={cohort.id}
+                      cohort={cohort}
+                      onSelect={handleSelectCohort}
+                      onEdit={handleEditCohort}
+                      onArchive={handleArchiveClick}
+                      onUnarchive={handleUnarchiveClick}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          {/* Диалог подтверждения архивации/разархивации */}
+          <Dialog open={!!confirmId} onOpenChange={(open) => !open && setConfirmId(null)}>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {confirmUnarchive ? "Восстановить когорту?" : "Архивировать когорту?"}
+                </DialogTitle>
+                <DialogDescription>
+                  {confirmUnarchive
+                    ? "Когорта снова станет доступна для работы с заявками, документами и задачами."
+                    : "Архивированная когорта будет перемещена во вкладку «Архив». С ней нельзя будет работать, пока вы её не восстановите."
+                  }
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => handleEditCohort(e, cohort)}
+                  variant="outline"
+                  onClick={() => setConfirmId(null)}
                 >
-                  Редактировать
+                  Отмена
                 </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+                <Button
+                  variant={confirmUnarchive ? "default" : "secondary"}
+                  onClick={handleConfirm}
+                  disabled={archiveMutation.isPending || unarchiveMutation.isPending}
+                >
+                  {confirmUnarchive ? "Восстановить" : "Архивировать"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
 
       <CohortFormDialog
